@@ -104,9 +104,9 @@
         "package": "PersistedPropertyWrapper",
         "repositoryURL": "https://github.com/AndrewBennet/PersistedPropertyWrapper.git",
         "state": {
-          "branch": null,
-          "revision": "d8c845a8e62ab305a039951b4e5c0ef95b26f01d",
-          "version": "2.1.0"
+          "branch": "master",
+          "revision": "7fda153a5dfbe7de02dd0fdc6e63e7abadbb0755",
+          "version": null
         }
       },
       {
