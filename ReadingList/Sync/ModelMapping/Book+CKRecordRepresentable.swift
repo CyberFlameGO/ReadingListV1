@@ -1,6 +1,7 @@
 import CloudKit
 import CoreData
 import os.log
+import CocoaLumberjackSwift
 import ReadingList_Foundation
 
 extension Book: CKRecordRepresentable {
@@ -35,7 +36,7 @@ extension Book: CKRecordRepresentable {
         if recordName.starts(with: "mid:") {
             return NSPredicate(format: "%K == %@", #keyPath(Book.manualBookId), String(recordName.dropFirst(4)))
         }
-        os_log("Unexpected format of remote record ID: %{public}s", log: .syncCoordinator, type: .error, recordName)
+        DDLogError("Unexpected format of remote record ID: \(recordName)")
         return NSPredicate(boolean: false)
     }
 
@@ -64,7 +65,7 @@ extension Book: CKRecordRepresentable {
             do {
                 return try NSKeyedArchiver.archivedData(withRootObject: authors, requiringSecureCoding: true) as NSData
             } catch {
-                os_log(.error, "Error decoding author data")
+                DDLogError("Error decoding author data: \(error.localizedDescription)")
                 return nil
             }
         case .coverImage:
@@ -115,7 +116,7 @@ extension Book: CKRecordRepresentable {
                     authors = authorsFromData
                 }
             } catch {
-                os_log(.error, log: .syncCoordinator, "Error decoding author data: %{public}s", error.localizedDescription)
+                DDLogError("Error decoding author data: \(error.localizedDescription)")
                 authors = []
             }
         case .coverImage:

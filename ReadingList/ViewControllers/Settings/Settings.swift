@@ -50,13 +50,14 @@ struct Settings: View {
                     )
                 }
                 SettingsCell(.importExport, title: "Import & Export", imageName: "doc.fill", color: .green)
-                SettingsCell(.backup, title: "Backup & Restore", imageName: "icloud.fill", color: .icloudBlue, badge: badgeOnBackupRow)
+                SettingsCell(.backup, title: "Backup & Restore", imageName: "arrow.counterclockwise", color: Color(.systemIndigo), badge: badgeOnBackupRow)
                     .onReceive(NotificationCenter.default.publisher(for: .autoBackupEnabledOrDisabled)) { _ in
                         badgeOnBackupRow = AutoBackupManager.shared.cannotRunScheduledAutoBackups
                     }
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.backgroundRefreshStatusDidChangeNotification)) { _ in
                         badgeOnBackupRow = AutoBackupManager.shared.cannotRunScheduledAutoBackups
                     }
+                SettingsCell(.icloudSync, title: "iCloud Sync", imageName: "icloud.fill", color: .icloudBlue)
                 SettingsCell(.privacy, title: "Privacy", imageName: "lock.fill", color: Color(.darkGray))
             }
         }.listStyle(GroupedListStyle())

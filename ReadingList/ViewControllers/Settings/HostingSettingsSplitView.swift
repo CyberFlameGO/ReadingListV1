@@ -9,6 +9,7 @@ enum SettingsSelection {
     case tip
     case importExport
     case backup
+    case icloudSync
     case privacy
 }
 

@@ -1,6 +1,7 @@
 import CloudKit
 import CoreData
 import os.log
+import CocoaLumberjackSwift
 import ReadingList_Foundation
 
 extension ListItem: CKRecordRepresentable {
@@ -11,15 +12,15 @@ extension ListItem: CKRecordRepresentable {
 
     static func matchCandidateItemForRemoteRecord(_ record: CKRecord) -> NSPredicate {
         guard record.recordType == ckRecordType else {
-            os_log("Attempted to match a CKRecord of type %{public}s to a ListItem", log: .syncCoordinator, type: .fault, record.recordType)
+            DDLogError("Attempted to match a CKRecord of type \(record.recordType) to a ListItem")
             return NSPredicate(boolean: false)
         }
         guard let bookReference = record[.book] as? CKRecord.Reference else {
-            os_log("No book reference on a ListItem", log: .syncCoordinator, type: .error)
+            DDLogError("No book reference on a ListItem")
             return NSPredicate(boolean: false)
         }
         guard let listReference = record[.list] as? CKRecord.Reference else {
-            os_log("No list reference on a ListItem", log: .syncCoordinator, type: .error)
+            DDLogError("No list reference on a ListItem")
             return NSPredicate(boolean: false)
         }
         return NSCompoundPredicate(andPredicateWithSubpredicates: [
@@ -51,14 +52,20 @@ extension ListItem: CKRecordRepresentable {
             let request = Book.fetchRequest()
             request.fetchLimit = 1
             request.predicate = NSPredicate(format: "%K == %@", SyncConstants.remoteIdentifierKeyPath, reference.recordID.recordName)
-            guard let matchingBook = try! managedObjectContext!.fetch(request).first else { return }
+            guard let matchingBook = try! managedObjectContext!.fetch(request).first else {
+                DDLogInfo("No book found with record name \(reference.recordID.recordName) for ListItem")
+                return
+            }
             setValue(matchingBook, forKey: #keyPath(ListItem.book))
         case .list:
             guard let reference = value as? CKRecord.Reference else { return }
             let request = List.fetchRequest()
             request.fetchLimit = 1
             request.predicate = NSPredicate(format: "%K == %@", SyncConstants.remoteIdentifierKeyPath, reference.recordID.recordName)
-            guard let matchingList = try! managedObjectContext!.fetch(request).first else { return }
+            guard let matchingList = try! managedObjectContext!.fetch(request).first else {
+                DDLogInfo("No List found with record name \(reference.recordID.recordName) for ListItem")
+                return
+            }
             setValue(matchingList, forKey: #keyPath(ListItem.list))
         }
     }

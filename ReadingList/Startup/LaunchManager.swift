@@ -6,6 +6,7 @@ import CoreData
 import ReadingList_Foundation
 import Reachability
 import PersistedPropertyWrapper
+import CocoaLumberjackSwift
 
 class LaunchManager {
 
@@ -23,9 +24,12 @@ class LaunchManager {
     */
     func initialise() {
         isFirstLaunch = AppLaunchHistory.appOpenedCount == 0
+
         #if DEBUG
         Debug.initialiseSettings()
         #endif
+
+        initialiseLogging()
         UserEngagement.initialiseUserAnalytics()
         SVProgressHUD.setDefaults()
         SwiftyStoreKit.completeTransactions()
@@ -34,6 +38,24 @@ class LaunchManager {
             AutoBackupManager.shared.registerBackgroundTasks()
             AutoBackupManager.shared.scheduleBackup()
         }
+    }
+
+    private func initialiseLogging() {
+        let logLevel: DDLogLevel
+        switch BuildInfo.thisBuild.type {
+        case .debug:
+            logLevel = .verbose
+        case .testFlight:
+            logLevel = .debug
+        case .appStore:
+            logLevel = .info
+        }
+        DDLog.add(DDOSLogger.sharedInstance, with: logLevel)
+
+        let fileLogger = DDFileLogger()
+        fileLogger.rollingFrequency = 60 * 60 * 24
+        fileLogger.logFileManager.maximumNumberOfLogFiles = 7
+        DDLog.add(fileLogger)
     }
 
     func handleApplicationDidBecomeActive() {

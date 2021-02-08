@@ -1,6 +1,7 @@
 import CloudKit
 import CoreData
 import os.log
+import CocoaLumberjackSwift
 import ReadingList_Foundation
 
 extension List: CKRecordRepresentable {
@@ -10,7 +11,7 @@ extension List: CKRecordRepresentable {
 
     static func matchCandidateItemForRemoteRecord(_ record: CKRecord) -> NSPredicate {
         guard record.recordType == ckRecordType else {
-            os_log("Attempted to match a CKRecord of type %{public}s to a List", log: .syncCoordinator, type: .fault, record.recordType)
+            DDLogError("Attempted to match a CKRecord of type \(record.recordType) to a List")
             return NSPredicate(boolean: false)
         }
         guard let listName = record[ListCKRecordKey.name] as? String else { return NSPredicate(boolean: false) }

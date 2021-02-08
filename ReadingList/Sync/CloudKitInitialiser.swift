@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import PersistedPropertyWrapper
+import CocoaLumberjackSwift
 import os.log
 
 class CloudKitInitialiser {
@@ -32,12 +33,12 @@ class CloudKitInitialiser {
 
     private func createCustomZoneIfNeeded() {
         guard !createdCustomZone else {
-            os_log("Already have custom zone, skipping creation but checking if zone really exists", log: .syncCoordinator, type: .debug)
+            DDLogInfo("Already have custom zone, skipping creation but checking if zone really exists")
             checkCustomZone()
             return
         }
 
-        os_log("Creating CloudKit zone %@", log: .syncCoordinator, type: .info, SyncConstants.zoneID)
+        DDLogInfo("Creating CloudKit zone \(SyncConstants.zoneID)")
 
         let zone = CKRecordZone(zoneID: SyncConstants.zoneID)
         let operation = CKModifyRecordZonesOperation(recordZonesToSave: [zone], recordZoneIDsToDelete: nil)
@@ -46,12 +47,12 @@ class CloudKitInitialiser {
             guard let self = self else { return }
 
             if let error = error {
-                os_log("Failed to create custom CloudKit zone: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                DDLogError("Failed to create custom CloudKit zone: \(String(describing: error))")
                 if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                     self.createCustomZoneIfNeeded()
                 }
             } else {
-                os_log("Zone created successfully", log: .syncCoordinator, type: .info)
+                DDLogInfo("Zone created successfully")
                 self.createdCustomZone = true
             }
         }
@@ -66,12 +67,12 @@ class CloudKitInitialiser {
             guard let self = self else { return }
 
             if let error = error {
-                os_log("Failed to check for custom zone existence: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                DDLogError("Failed to check for custom zone existence: \(String(describing: error))")
 
                 if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                     self.checkCustomZone()
                 } else {
-                    os_log("Irrecoverable error when fetching custom zone, assuming it doesn't exist: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                    DDLogError("Irrecoverable error when fetching custom zone, assuming it doesn't exist: \(String(describing: error))")
 
                     DispatchQueue.main.async {
                         self.createdCustomZone = false
@@ -79,7 +80,7 @@ class CloudKitInitialiser {
                     }
                 }
             } else if ids == nil || ids!.isEmpty {
-                os_log("Custom zone reported as existing, but it doesn't exist. Creating.", log: .syncCoordinator, type: .error)
+                DDLogError("Custom zone reported as existing, but it doesn't exist. Creating.")
                 self.createdCustomZone = false
                 self.createCustomZoneIfNeeded()
             }
@@ -91,7 +92,7 @@ class CloudKitInitialiser {
 
     private func createPrivateSubscriptionsIfNeeded() {
         guard !createdPrivateSubscription else {
-            os_log("Already subscribed to private database changes, skipping subscription but checking if it really exists", log: .syncCoordinator, type: .debug)
+            DDLogInfo("Already subscribed to private database changes, skipping subscription but checking if it really exists")
             checkSubscription()
             return
         }
@@ -109,16 +110,13 @@ class CloudKitInitialiser {
             guard let self = self else { return }
 
             if let error = error {
-                os_log("Failed to create private CloudKit subscription: %{public}@",
-                       log: .syncCoordinator,
-                       type: .error,
-                       String(describing: error))
+                DDLogError("Failed to create private CloudKit subscription: \(String(describing: error))")
 
                 if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                     self.createPrivateSubscriptionsIfNeeded()
                 }
             } else {
-                os_log("Private subscription created successfully", log: .syncCoordinator, type: .info)
+                DDLogInfo("Private subscription created successfully")
                 self.createdPrivateSubscription = true
             }
         }
@@ -133,12 +131,12 @@ class CloudKitInitialiser {
             guard let self = self else { return }
 
             if let error = error {
-                os_log("Failed to check for private zone subscription existence: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                DDLogError("Failed to check for private zone subscription existence: \(String(describing: error))")
 
                 if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                     self.checkSubscription()
                 } else {
-                    os_log("Irrecoverable error when fetching private zone subscription, assuming it doesn't exist: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                    DDLogError("Irrecoverable error when fetching private zone subscription, assuming it doesn't exist: \(String(describing: error))")
 
                     DispatchQueue.main.async {
                         self.createdPrivateSubscription = false
@@ -146,7 +144,7 @@ class CloudKitInitialiser {
                     }
                 }
             } else if ids == nil || ids!.isEmpty {
-                os_log("Private subscription reported as existing, but it doesn't exist. Creating.", log: .syncCoordinator, type: .error)
+                DDLogError("Private subscription reported as existing, but it doesn't exist. Creating.")
 
                 DispatchQueue.main.async {
                     self.createdPrivateSubscription = false

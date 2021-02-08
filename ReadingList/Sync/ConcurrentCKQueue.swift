@@ -1,5 +1,6 @@
 import Foundation
 import CloudKit
+import CocoaLumberjackSwift
 import os.log
 
 class ConcurrentCKQueue {
@@ -23,11 +24,11 @@ class ConcurrentCKQueue {
         operation.qualityOfService = qos
         operationQueue.addOperation(operation)
     }
-    
+
     func suspend() {
         operationQueue.isSuspended = true
     }
-    
+
     func resume() {
         operationQueue.isSuspended = false
     }
@@ -35,11 +36,11 @@ class ConcurrentCKQueue {
     func suspendCloudInterop(dueTo error: Error) -> Bool {
         guard let effectiveError = error as? CKError else { return false }
         guard let retryDelay = effectiveError.retryAfterSeconds else {
-            os_log("Error is not recoverable", log: .syncCoordinator, type: .error)
+            DDLogError("Error is not recoverable")
             return false
         }
 
-        os_log("Error is recoverable. Will retry after %{public}f seconds", log: .syncCoordinator, type: .error, retryDelay)
+        DDLogError("Error is recoverable. Will retry after \(retryDelay) seconds")
         self.operationQueue.isSuspended = true
         // TODO Wrong queue, really
         cloudQueue.asyncAfter(deadline: .now() + retryDelay) {

@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import CoreData
+import CocoaLumberjackSwift
 import os.log
 
 struct SyncConstants {
@@ -53,6 +54,7 @@ extension CKRecordRepresentable {
             ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID))
         } else {
             let recordName = newRecordName()
+            // TODO: Perhaps we should store the proposed record name on the ListItems always?
             remoteIdentifier = recordName
             ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: CKRecord.ID(recordName: recordName, zoneID: SyncConstants.zoneID))
         }
@@ -72,13 +74,13 @@ extension CKRecordRepresentable {
 
     func setSystemAndIdentifierFields(from ckRecord: CKRecord) {
         guard remoteIdentifier == nil || remoteIdentifier == ckRecord.recordID.recordName else {
-            os_log("Attempted to update local object with remoteIdentifier %{public}s from a CKRecord which has record name %{public}s", log: .syncCoordinator, type: .fault, remoteIdentifier!, ckRecord.recordID.recordName)
-            os_log("%{public}s", log: .syncCoordinator, type: .fault, Thread.callStackSymbols.joined(separator: "\n"))
+            DDLogError("Attempted to update local object with remoteIdentifier \(remoteIdentifier!) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
+            DDLogError(Thread.callStackSymbols.joined(separator: "\n"))
             fatalError("Attempted to update local object from CKRecord with different remoteIdentifier")
         }
 
         if let existingCKRecordSystemFields = getSystemFieldsRecord(), existingCKRecordSystemFields.recordChangeTag == ckRecord.recordChangeTag {
-            os_log("CKRecord %{public}s has same change tag as local book; no update made", log: .syncCoordinator, type: .debug, ckRecord.recordID.recordName)
+            DDLogDebug("CKRecord \(ckRecord.recordID.recordName) has same change tag as local book; no update made")
             return
         }
 
@@ -87,7 +89,7 @@ extension CKRecordRepresentable {
         }
         setSystemFields(ckRecord)
     }
-    
+
     @discardableResult
     static func create(from ckRecord: CKRecord, in context: NSManagedObjectContext) -> Self {
         let newItem = Self(context: context)
@@ -105,7 +107,7 @@ extension CKRecordRepresentable {
         // This book may have local changes which we don't want to overwrite with the values on the server.
         for key in Self.allCKRecordKeys {
             if let excludedKeys = excludedKeys, excludedKeys.contains(key) {
-                os_log(.info, log: .syncCoordinator, "CKRecordKey '%{public}s' not used to update local store due to pending local change", key)
+                DDLogDebug("CKRecordKey '\(key)' not used to update local store due to pending local change")
                 continue
             }
             setValue(ckRecord[key], for: key)

@@ -4,6 +4,7 @@ import os.log
 import PersistedPropertyWrapper
 import ReadingList_Foundation
 import CoreData
+import CocoaLumberjackSwift
 import Reachability
 
 @available(iOS 13.0, *)
@@ -12,23 +13,23 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
     private let persistentStoreCoordinator: NSPersistentStoreCoordinator
     private let orderedTypesToSync: [CKRecordRepresentable.Type]
 
-    public init(persistentStoreCoordinator: NSPersistentStoreCoordinator, orderedTypesToSync: [CKRecordRepresentable.Type]) {
+    init(persistentStoreCoordinator: NSPersistentStoreCoordinator, orderedTypesToSync: [CKRecordRepresentable.Type]) {
         self.persistentStoreCoordinator = persistentStoreCoordinator
         self.orderedTypesToSync = orderedTypesToSync
     }
 
     /// Local Core Data transactions which have not yet been confirmed to have been pushed  to CloudKit. The push may have been initiated, but
     /// no response yet received.
-    private var unconfirmedLocalTransactions = [NSPersistentHistoryTransaction]()
+    private var localTransactionsBuffer = [NSPersistentHistoryTransaction]()
 
     private let cloudOperationQueue = ConcurrentCKQueue()
     private lazy var cloudKitInitialiser = CloudKitInitialiser(cloudOperationQueue: cloudOperationQueue)
-    
+
     private let reachability: Reachability? = {
         do {
             return try Reachability()
         } catch {
-            os_log("Reachability could not be initialized: %{public}@", log: .syncCoordinator, type: .error, error.localizedDescription)
+            DDLogError("Reachability could not be initialized: \(error.localizedDescription)")
             return nil
         }
     }()
@@ -47,21 +48,29 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
     #if DEBUG
     private var debugSimulatorSyncPollTimer: Timer?
     #endif
+    
+    private var persistentStoreRemoteChangeObserver: Any?
 
-    public func start() {
+    func start() {
+        DDLogInfo("SyncCoordinator starting")
         self.syncContext.perform {
             self.cloudKitInitialiser.prepareCloudEnvironment { [weak self] in
                 guard let self = self else { return }
+                DDLogInfo("Cloud environment prepared")
                 self.syncContext.perform {
-                    os_log("Cloud environment preparation done", log: .syncCoordinator, type: .default)
 
                     // Initialise our in-memory transaction retrieval timestamp from the persisted cloudkit commited timestamp
-                    self.localTransactionBufferTimestamp = self.lastLocaTransactionTimestampCommittedToCloudKit
-                    
+                    self.localTransactionBufferTimestamp = self.lastLocaTransactionCommittedToCloudKitTimestamp
+
                     // Read the local transactions, and observe future changes so we continue to do this ongoing
                     self.readLocalTransactionsToBuffer()
-                    NotificationCenter.default.addObserver(forName: .NSPersistentStoreRemoteChange, object: self.persistentStoreCoordinator, queue: nil, using: self.handleStoreChange(notification:))
-                    
+                    self.persistentStoreRemoteChangeObserver = NotificationCenter.default.addObserver(
+                        forName: .NSPersistentStoreRemoteChange,
+                        object: self.persistentStoreCoordinator,
+                        queue: nil,
+                        using: self.handleLocalChange(notification:)
+                    )
+
                     // Monitoring the network reachabiity will allow us to automatically re-do work when network connectivity resumes
                     self.monitorNetworkReachability()
 
@@ -74,6 +83,10 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
                 }
             }
         }
+    }
+
+    public func stop() {
+        #warning("stop() not implemented yet")
     }
 
     @objc public func respondToRemoteChangeNotification() {
@@ -89,14 +102,14 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             try reachability.startNotifier()
             NotificationCenter.default.addObserver(self, selector: #selector(networkConnectivityDidChange), name: .reachabilityChanged, object: nil)
         } catch {
-            os_log("Error starting reachability notifier: %{public}s", log: .syncCoordinator, type: .error, error.localizedDescription)
+            DDLogError("Error starting reachability notifier: \(error.localizedDescription)")
         }
     }
 
     @objc private func networkConnectivityDidChange() {
         syncContext.perform {
             guard let reachability = self.reachability else { preconditionFailure("Reachability was nil in a networkChange callback") }
-            os_log("Network connectivity changed to %{public}s", log: .syncCoordinator, type: .info, reachability.connection.description)
+            DDLogDebug("Network connectivity changed to \(reachability.connection.description)")
             if reachability.connection == .unavailable {
                 self.cloudOperationQueue.suspend()
             } else {
@@ -105,19 +118,19 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             }
         }
     }
-    
+
     // MARK: - Upload
 
     @Persisted("SyncEngine_LocalChangeTimestamp")
-    private var lastLocaTransactionTimestampCommittedToCloudKit: Date?
+    private var lastLocaTransactionCommittedToCloudKitTimestamp: Date?
 
     private var localTransactionBufferTimestamp: Date?
 
     private lazy var historyFetcher = PersistentHistoryFetcher(context: syncContext, excludeHistoryFromContextWithName: syncContext.name!)
 
-    private func handleStoreChange(notification: Notification) {
+    private func handleLocalChange(notification: Notification) {
         self.syncContext.perform {
-            os_log(.info, log: .syncCoordinator, "Merging store changes into syncContext")
+            DDLogInfo("Handling local change")
             self.syncContext.mergeChanges(fromContextDidSave: notification)
             self.readLocalTransactionsToBuffer()
             self.uploadLocalChanges()
@@ -126,20 +139,15 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
 
     private func readLocalTransactionsToBuffer() {
         guard let fetchFromWhen = localTransactionBufferTimestamp else {
-            os_log(.default, log: .syncCoordinator, "No last retrieved timestamp recorded; cannot extract changes yet")
+            DDLogInfo("No local transaction timestamp stored; cannot extract changes yet")
             return
         }
 
         let transactions = historyFetcher.fetch(fromDate: fetchFromWhen)
-        if let lastTransactionTimestamp = transactions.last?.timestamp {
-            self.localTransactionBufferTimestamp = lastTransactionTimestamp
-        }
-        os_log(.info, log: .syncCoordinator, "Retrieved %d transaction(s) since %{time_t}d", transactions.count, time_t(fetchFromWhen.timeIntervalSince1970))
-        
-        guard !transactions.isEmpty else { return }
-
-        self.unconfirmedLocalTransactions.append(contentsOf: transactions)
-        os_log(.info, log: .syncCoordinator, "%d transaction(s) added to upload buffer", transactions.count)
+        guard let lastTransactionTimestamp = transactions.last?.timestamp else { return }
+        self.localTransactionBufferTimestamp = lastTransactionTimestamp
+        self.localTransactionsBuffer.append(contentsOf: transactions)
+        DDLogInfo("Appended \(transactions.count) transaction(s) from \(fetchFromWhen) until \(lastTransactionTimestamp) to upload buffer")
     }
 
     private func getAllObjectCkRecords() -> [CKRecord] {
@@ -153,34 +161,39 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             let objects = try! syncContext.fetch(request) as! [CKRecordRepresentable]
             ckRecords.append(contentsOf: objects.map { $0.buildCKRecord() })
         }
-        syncContext.saveIfChanged()
+        
+        // TODO What was this for? Anything?
+        //syncContext.saveIfChanged()
         return ckRecords
     }
 
     private func uploadLocalChanges() {
-        if lastLocaTransactionTimestampCommittedToCloudKit == nil {
+        if lastLocaTransactionCommittedToCloudKitTimestamp == nil {
+            DDLogInfo("No local transactions previously commit to CloudKit, uploading all objects")
             let now = Date()
             localTransactionBufferTimestamp = now
             let allRecords = getAllObjectCkRecords()
             uploadChanges(records: allRecords, deletions: []) {
-                self.lastLocaTransactionTimestampCommittedToCloudKit = now
+                self.lastLocaTransactionCommittedToCloudKitTimestamp = now
             }
             return
         }
 
-        guard let transactionToUpload = unconfirmedLocalTransactions.first else {
-            os_log("No transactions to process", log: .syncCoordinator, type: .info, unconfirmedLocalTransactions.count)
+        // TODO REMOVE FIRST?
+        guard let transactionToUpload = localTransactionsBuffer.first else {
+            DDLogInfo("No local transactions to upload")
             return
         }
 
         func onTransactionUploadCompletion() {
-            let removedFirstTransaction = self.unconfirmedLocalTransactions.removeFirst()
+            let removedFirstTransaction = self.localTransactionsBuffer.removeFirst()
             if transactionToUpload != removedFirstTransaction {
-                preconditionFailure("Concurrency error; first transaction in buffer is not the same as the processed transaction")
+                DDLogError("Concurrency error; first transaction in buffer is not the same as the processed transaction")
+                fatalError("Concurrency error; first transaction in buffer is not the same as the processed transaction")
             }
 
-            self.lastLocaTransactionTimestampCommittedToCloudKit = removedFirstTransaction.timestamp
-            os_log("Updated last-pushed local timestamp to %{time_t}d", log: .syncCoordinator, time_t(removedFirstTransaction.timestamp.timeIntervalSince1970))
+            self.lastLocaTransactionCommittedToCloudKitTimestamp = removedFirstTransaction.timestamp
+            DDLogInfo("Updated last-pushed local timestamp to \(removedFirstTransaction.timestamp)")
 
             self.uploadLocalChanges()
         }
@@ -189,11 +202,11 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             onTransactionUploadCompletion()
             return
         }
-        
-        os_log("Processing persistent changes: %@", log: .syncCoordinator, type: .debug, changes.map {
-            var base = "\($0.changeType.description) \($0.changedObjectID)"
+
+        DDLogDebug("Processing local transaction consisting of changes:\n" + changes.map {
+            var base = "\($0.changeType.description) \($0.changedObjectID.uriRepresentation().path)"
             if $0.changeType == .update {
-                base += " with changed keys [\($0.updatedProperties?.map(\.name).joined(separator: ", ") ?? "")]"
+                base += " [\($0.updatedProperties?.map(\.name).joined(separator: ", ") ?? "")]"
             }
             return base
         }.joined(separator: "\n"))
@@ -207,10 +220,10 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
                 return (change, managedObject)
             }
         let changesByEntityType = Dictionary(grouping: changesAndObjects, by: { $0.managedObject.entity })
-        
+
         let ckRecords = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity()] }
             .flatMap { $0 }
-            .compactMap { (change, managedObject) -> CKRecord? in
+            .compactMap { change, managedObject -> CKRecord? in
                 let ckKeysToUpload: [String]?
                 if change.changeType == .update {
                     guard let coreDataKeys = change.updatedProperties?.map(\.name) else { return nil }
@@ -229,7 +242,7 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
                 guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
                 return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
             }
-        
+
         // Buiding the CKRecord can in some cases cause updates to the managed object; save if this is the case
         self.syncContext.saveIfChanged()
         self.uploadChanges(records: ckRecords, deletions: deletionIDs, completion: onTransactionUploadCompletion)
@@ -241,15 +254,19 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             return
         }
 
-        os_log("Uploading %d record(s) and %d deletion(s)", log: .syncCoordinator, type: .info, records.count, deletions.count)
+        DDLogInfo("Uploading \(records.count) record(s) and \(deletions.count) deletion(s):\n"
+            + records.map { "Upload \($0.recordType.description) \($0.recordID.recordName) [\($0.changedKeys().joined(separator: ", "))]" }.joined(separator: "\n") + "\n"
+            + deletions.map { "Delete \($0.recordName)" }.joined(separator: "\n")
+        )
+
         let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: deletions)
         operation.perRecordCompletionBlock = { [weak self] record, error in
             guard let self = self else { return }
             self.syncContext.perform {
-                if let error = error {
-                    os_log("Error uploading CKRecord %@ with keys %@", log: .syncCoordinator, type: .debug, record.recordID.recordName, record.allKeys())
+                if error != nil {
+                    DDLogVerbose("CKRecord \(record.recordID.recordName) upload errored")
                 } else {
-                    os_log("CKRecord %@ uploaded with keys %@", log: .syncCoordinator, type: .debug, record.recordID.recordName, record.allKeys())
+                    DDLogVerbose("CKRecord \(record.recordID.recordName) upload completed")
                 }
             }
         }
@@ -257,12 +274,12 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             guard let self = self else { return }
             self.syncContext.perform {
                 if let error = error {
-                    os_log("Failed to upload records", log: .syncCoordinator, type: .error)
+                    DDLogError("Error during record upload")
                     self.handleUploadError(error, records: records, ids: deletions, completion: completion)
                 } else {
-                    os_log("Successfully uploaded %{public}d record(s) and %{public}d deletion(s)", log: .syncCoordinator, type: .info, records.count, deletions.count)
+                    DDLogInfo("Completed upload")
                     guard let serverRecords = serverRecords else {
-                        os_log("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation", log: .syncCoordinator, type: .fault)
+                        DDLogError("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation")
                         self.handleUnexpectedResponse()
                         return
                     }
@@ -278,37 +295,42 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
     }
 
     func handleUnexpectedResponse() {
+        DDLogError("Unimplemented function handleUnexpectedResponse")
         fatalError("Should stop syncing, at least for a bit")
     }
 
     private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID], completion: @escaping () -> Void) {
         guard let ckError = error as? CKError else {
-            os_log("Error was not a CKError, giving up: %{public}@", log: .syncCoordinator, type: .fault, String(describing: error))
+            handleUnexpectedResponse()
             return
         }
 
+        DDLogInfo("Upload error occurred with CKError code \(ckError.code.name)")
         if ckError.code == .limitExceeded {
-            os_log("CloudKit batch limit exceeded, sending records in chunks", log: .syncCoordinator, type: .error)
-
+            DDLogError("CloudKit batch limit exceeded, sending records in chunks")
             fatalError("Not implemented: batch uploads. Here we should divide the records in chunks and upload in batches instead of trying everything at once.")
         } else if ckError.code == .partialFailure {
-            os_log("Upload partial failure", log: .syncCoordinator, type: .error)
             guard let errorsByItemId = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] else {
-                os_log("Missing CKPartialErrorsByItemIDKey data", log: .syncCoordinator, type: .fault)
+                DDLogError("Missing CKPartialErrorsByItemIDKey data")
                 self.handleUnexpectedResponse()
                 return
             }
+
             var refetchIDs = [CKRecord.ID]()
             for record in records {
-                if let uploadError = errorsByItemId[record.recordID] as? CKError {
-                    if uploadError.code == .serverRecordChanged {
-                        refetchIDs.append(record.recordID)
-                    } else if uploadError.code == .batchRequestFailed {
-                        continue
-                    }
-                } else {
+                guard let uploadError = errorsByItemId[record.recordID] as? CKError else {
+                    DDLogError("Missing CKError for record \(record.recordID.recordName)")
                     handleUnexpectedResponse()
                     return
+                }
+                if uploadError.code == .serverRecordChanged {
+                    DDLogInfo("CKRecord \(record.recordID.recordName) upload failed as server record has changed")
+                    refetchIDs.append(record.recordID)
+                } else if uploadError.code == .batchRequestFailed {
+                    DDLogVerbose("CKRecord \(record.recordID.recordName) part of failed upload batch")
+                    continue
+                } else {
+                    DDLogError("Unhandled error \(uploadError.code.name) for CKRecord \(record.recordID.recordName)")
                 }
             }
 
@@ -319,7 +341,7 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             if cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                 self.uploadChanges(records: records, deletions: ids, completion: completion)
             } else {
-                os_log("Error is not recoverable: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                DDLogError("Error is not recoverable: \(String(describing: error))")
                 handleUnexpectedResponse()
             }
         }
@@ -331,18 +353,18 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             saveRecordDataLocally(record, option: .storeSystemFieldsOnly)
         }
         syncContext.saveAndLogIfErrored()
-        os_log("Completed updating %d local model(s) after upload", log: .syncCoordinator, type: .default, records.count)
+        DDLogInfo("Completed updating \(records.count) local model(s) after upload")
     }
 
     // MARK: - Remote change tracking
 
     @Persisted(archivedDataKey: "SyncEngine_SeverChangeToken")
-    private var privateChangeToken: CKServerChangeToken?
+    private var remoteChangeToken: CKServerChangeToken?
 
     private func fetchRemoteChanges() {
         let operation = CKFetchRecordZoneChangesOperation()
         let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration(
-            previousServerChangeToken: privateChangeToken,
+            previousServerChangeToken: remoteChangeToken,
             resultsLimit: nil,
             desiredKeys: nil
         )
@@ -351,24 +373,23 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
         operation.fetchAllChanges = true
 
         operation.recordZoneChangeTokensUpdatedBlock = { [weak self] _, changeToken, _ in
-            os_log("recordZoneChangeTokensUpdatedBlock", log: .syncCoordinator, type: .debug)
             guard let self = self else { return }
             self.syncContext.perform {
+                DDLogInfo("Server change token updated")
                 self.syncContext.saveAndLogIfErrored()
-                self.privateChangeToken = changeToken
+                self.remoteChangeToken = changeToken
             }
         }
 
         operation.recordZoneFetchCompletionBlock = { [weak self] _, token, _, _, error in
-            os_log("recordZoneFetchCompletionBlock", log: .syncCoordinator, type: .debug)
             guard let self = self else { return }
             self.syncContext.perform {
                 if let error = error as? CKError {
-                    os_log("Failed to fetch record zone changes: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                    DDLogError("Failed to fetch record zone changes: \(String(describing: error))")
 
                     if error.code == .changeTokenExpired {
-                        os_log("Change token expired, resetting token and trying again", log: .syncCoordinator, type: .error)
-                        self.privateChangeToken = nil
+                        DDLogError("Change token expired, resetting token and trying again")
+                        self.remoteChangeToken = nil
                         self.fetchRemoteChanges()
                     } else {
                         if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
@@ -376,23 +397,22 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
                         }
                     }
                 } else {
-                    os_log("Commiting new change token", log: .syncCoordinator, type: .debug)
-                    self.privateChangeToken = token
+                    DDLogDebug("Remote record fetch completed; commiting new change token")
+                    self.remoteChangeToken = token
                     self.syncContext.saveIfChanged()
                 }
             }
         }
 
         operation.recordChangedBlock = { [weak self] record -> Void in
-            os_log("recordChangedBlock", log: .syncCoordinator, type: .debug)
             guard let self = self else { return }
             self.syncContext.perform {
+                DDLogVerbose("Handing remote record change")
                 self.saveRecordDataLocally(record, option: .createIfNotFound)
             }
         }
 
         operation.recordWithIDWasDeletedBlock = { [weak self] recordID, recordType in
-            os_log("recordWithIDWasDeletedBlock", log: .syncCoordinator, type: .debug)
             guard let self = self else { return }
             self.syncContext.perform {
                 let localObject = self.localEntity(forIdentifier: CKRecordIdentity(ID: recordID, type: recordType))
@@ -401,11 +421,11 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
         }
 
         operation.fetchRecordZoneChangesCompletionBlock = { [weak self] error in
-            os_log("fetchRecordZoneChangesCompletionBlock", log: .syncCoordinator, type: .debug)
             guard let self = self else { return }
+            DDLogInfo("Remote change fetch completed")
             self.syncContext.perform {
                 if let error = error {
-                    os_log("Failed to fetch record zone changes: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                    DDLogError("Failed to fetch record zone changes: \(String(describing: error))")
 
                     if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                         self.fetchRemoteChanges()
@@ -417,6 +437,11 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
         }
 
         operation.queuePriority = .high
+        if remoteChangeToken != nil {
+            DDLogInfo("Enqueuing operation to fetch remote changes using CKServerChangeToken")
+        } else {
+            DDLogInfo("Enqueuing operation to fetch all remote changes")
+        }
         cloudOperationQueue.addOperation(operation)
     }
 
@@ -426,11 +451,11 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             guard let self = self else { return }
             self.syncContext.perform {
                 if let error = error {
-                    os_log("Failed to fetch records: %{public}@", log: .syncCoordinator, type: .error, String(describing: error))
+                    DDLogError("Failed to fetch records: \(String(describing: error))")
                     if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
                         self.fetchRecords(recordIDs, completion: completion)
                     } else {
-                        os_log("WHAT TO DO HERE?", log: .syncCoordinator, type: .fault)
+                        DDLogError("WHAT TO DO HERE?")
                     }
                     return
                 }
@@ -445,16 +470,17 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
         }
 
         operation.queuePriority = .high
+        DDLogInfo("Fetching remote records with IDs \(recordIDs.map { $0.recordName }.joined(separator: ", "))")
         cloudOperationQueue.addOperation(operation)
     }
 
     private func commitServerChangesToDatabase(with changedRecords: [CKRecord], deletedRecordIDs: [CKRecordIdentity]) {
         guard !changedRecords.isEmpty || !deletedRecordIDs.isEmpty else {
-            os_log("Finished record zone changes fetch with no changes", log: .syncCoordinator, type: .info)
+            DDLogInfo("Finished record zone changes fetch with no changes")
             return
         }
 
-        os_log("Will commit %d changed record(s) and %d deleted record(s) to the database", log: .syncCoordinator, type: .info, changedRecords.count, deletedRecordIDs.count)
+        DDLogInfo("Will commit \(changedRecords.count) changed record(s) and \(deletedRecordIDs.count) deleted record(s) to the database")
         for record in changedRecords {
             self.saveRecordDataLocally(record, option: .createIfNotFound)
         }
@@ -462,12 +488,12 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
             self.localEntity(forIdentifier: deletedID)?.delete()
         }
         self.syncContext.saveAndLogIfErrored()
-        os_log("Completed updating local model(s) after download", log: .syncCoordinator, type: .default)
+        DDLogInfo("Completed updating local model(s) after download")
     }
 
     private func localEntity(forIdentifier remoteIdentifier: CKRecordIdentity) -> NSManagedObject? {
         guard let entityType = orderedTypesToSync.first(where: { remoteIdentifier.type == $0.ckRecordType }) else {
-            os_log("Unexpected record type supplied: %{public}s", log: .syncCoordinator, type: .error, remoteIdentifier.type)
+            DDLogError("Unexpected record type supplied: \(remoteIdentifier.type)")
             return nil
         }
         return lookupLocalObject(ofType: entityType, withIdentifier: remoteIdentifier.ID.recordName)
@@ -481,16 +507,16 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
     private func saveRecordDataLocally(_ ckRecord: CKRecord, option: DownloadOption?) {
         if let localObject = lookupLocalObject(for: ckRecord) {
             if localObject.isDeleted {
-                os_log("Local %{public}s was deleted; skipping local update", log: .syncCoordinator, type: .default, ckRecord.recordType)
+                DDLogInfo("Local \(ckRecord.recordType) was deleted; skipping local update")
                 return
             }
 
-            os_log("Updating existing local %{public}s with remote record %{public}s", log: .syncCoordinator, type: .info, ckRecord.recordType, ckRecord.recordID.recordName)
+            DDLogInfo("Updating \(ckRecord.recordType) from CKRecord \(ckRecord.recordID.recordName)")
             if option == .storeSystemFieldsOnly {
                 localObject.setSystemAndIdentifierFields(from: ckRecord)
-                os_log("Updated system fields for CKRecord %{public}s on object %{public}s", log: .syncCoordinator, type: .info, ckRecord.recordID.recordName, localObject.objectID.uriRepresentation().relativeString)
+                DDLogInfo("Updated system fields for CKRecord \(ckRecord.recordID.recordName) on object \(localObject.objectID.uriRepresentation().path)")
             } else {
-                let keysPendingUpdate = unconfirmedLocalTransactions.compactMap { $0.changes }
+                let keysPendingUpdate = localTransactionsBuffer.compactMap { $0.changes }
                     .flatMap { $0 }
                     .filter { $0.changeType == .update && $0.changedObjectID == localObject.objectID }
                     .compactMap { $0.updatedProperties }
@@ -499,13 +525,13 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
                     .distinct()
 
                 localObject.update(from: ckRecord, excluding: keysPendingUpdate)
-                os_log("Updated metadata for CKRecord %{public}s on object %{public}s", log: .syncCoordinator, type: .info, ckRecord.recordID.recordName, localObject.objectID.uriRepresentation().relativeString)
+                DDLogInfo("Updated metadata for CKRecord \(ckRecord.recordID.recordName) on object \(localObject.objectID.uriRepresentation().path)")
             }
         } else if option == .createIfNotFound {
-            os_log("No local %{public}s found with record name %{public}s; creating one instead", log: .syncCoordinator, type: .default, ckRecord.recordType, ckRecord.recordType, ckRecord.recordID.recordName)
-            
+            DDLogInfo("Creating new \(ckRecord.recordType) with record name \(ckRecord.recordID.recordName)")
+
             guard let type = orderedTypesToSync.first(where: { $0.ckRecordType == ckRecord.recordType }) else {
-                os_log("No type corresponding to %{public}s found", log: .syncCoordinator, type: .error, ckRecord.recordType)
+                DDLogError("No type corresponding to \(ckRecord.recordType) found")
                 return
             }
             let newObject = type.create(from: ckRecord, in: syncContext)
@@ -517,10 +543,9 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
 
         let recordName = remoteRecord.recordID.recordName
         if let localItem = lookupLocalObject(ofType: type, withIdentifier: recordName) {
-            os_log("Found local %{public}s with specified remote identifier %{public}s", log: .syncCoordinator, type: .debug, type.ckRecordType, recordName)
+            DDLogDebug("Found local \(type.ckRecordType) with remote identifier \(recordName)")
             return localItem
         }
-        os_log("No local %{public}s with specified remote identifier %{public}s; looking for other candidates", log: .syncCoordinator, type: .debug, type.ckRecordType, recordName)
 
         let localIdLookup = type.fetchRequest()
         localIdLookup.fetchLimit = 1
@@ -532,12 +557,11 @@ final class SyncCoordinator { //swiftlint:disable:this type_body_length
         )
 
         if let localItem = (try! syncContext.fetch(localIdLookup)).first as? CKRecordRepresentable {
-            os_log("Found candidate local %{public}s for remote record %{public}s using metadata", log: .syncCoordinator, type: .debug,
-                   type.ckRecordType, recordName)
+            DDLogDebug("Found candidate local \(type.ckRecordType) for remote record \(recordName) using metadata")
             return localItem
         }
 
-        os_log("No local %{public}s found for remote record %{public}s", log: .syncCoordinator, type: .debug, type.ckRecordType, recordName)
+        DDLogDebug("No local \(type.ckRecordType) found for remote record \(recordName)")
         return nil
     }
 

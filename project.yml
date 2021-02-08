@@ -53,6 +53,9 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation.git
     minorVersion: 0.9.0
+  CocoaLumberjack:
+    url: https://github.com/CocoaLumberjack/CocoaLumberjack.git
+    minorVersion: 3.7.0
 
 fileGroups:
   - Debug/
@@ -99,6 +102,8 @@ targets:
       - package: CHCSVParser
       - package: SVProgressHUD
       - package: Reachability
+      - package: CocoaLumberjack
+        product: CocoaLumberjackSwift
       - package: ZIPFoundation
       - package: Firebase
         product: FirebaseCrashlytics

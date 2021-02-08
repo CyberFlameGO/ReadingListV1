@@ -1,6 +1,6 @@
 import UIKit
 import Reachability
-import os.log
+import CocoaLumberjackSwift
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -22,6 +22,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         launchManager.initialise()
+
+        DDLogInfo("Application launched")
         upgradeManager.performNecessaryUpgradeActions()
 
         // Remote notifications are required for iCloud sync.
@@ -37,7 +39,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // If there were any options, they will be handled once the store is initialised
         return !options.any()
     }
-    
+
     private func initialiseSyncCoordinator() {
         // Initialise the Sync Coordinator which will maintain iCloud synchronisation
         self.syncCoordinator = SyncCoordinator(
@@ -63,17 +65,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        os_log("Successfully registered for remote notifications", type: .info)
+        DDLogInfo("Successfully registered for remote notifications")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        os_log("Failed to register for remote notifications: %{public}s", type: .error, error.localizedDescription)
+        DDLogError("Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        guard #available(iOS 13.0, *) else { return }
-        if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = (self.syncCoordinator as? SyncCoordinator) {
+        DDLogInfo("Application received remote notification")
+        if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = self.syncCoordinator {
             syncCoordinator.respondToRemoteChangeNotification()
         }
     }

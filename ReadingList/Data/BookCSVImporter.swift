@@ -124,7 +124,7 @@ class BookCSVParserDelegate: CSVParserDelegate {
             attach(csvRow.lists, to: book)
 
             // If the book is not valid, delete it
-            let objectIdForLogging = book.objectID.uriRepresentation().absoluteString
+            let objectIdForLogging = book.objectID.uriRepresentation().path
             do {
                 try book.validateForUpdate()
             } catch {
