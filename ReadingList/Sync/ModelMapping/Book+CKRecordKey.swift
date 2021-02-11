@@ -11,6 +11,7 @@ extension Book {
         case subtitle = "subtitle"
         case authors = "authors"
         case googleBooksId = "googleBooksId"
+        case manualBookId = "manualBookId"
         case isbn13 = "isbn13"
         case pageCount = "pageCount"
         case publicationDate = "publicationDate"
@@ -30,6 +31,7 @@ extension Book {
             case #keyPath(Book.authors): return .authors
             case #keyPath(Book.coverImage): return .coverImage
             case #keyPath(Book.googleBooksId): return .googleBooksId
+            case #keyPath(Book.manualBookId): return .manualBookId
             case Book.Key.isbn13.rawValue: return .isbn13
             case Book.Key.pageCount.rawValue: return .pageCount
             case #keyPath(Book.publicationDate): return .publicationDate
@@ -52,6 +54,7 @@ extension Book {
             case .authors: return [#keyPath(Book.authors)]
             case .coverImage: return [#keyPath(Book.coverImage)]
             case .googleBooksId: return [#keyPath(Book.googleBooksId)]
+            case .manualBookId: return [#keyPath(Book.manualBookId)]
             case .isbn13: return [Book.Key.isbn13.rawValue]
             case .pageCount: return [Book.Key.pageCount.rawValue]
             case .publicationDate: return [#keyPath(Book.publicationDate)]

@@ -1,6 +1,8 @@
 import UIKit
 import Reachability
-import CocoaLumberjackSwift
+import Logging
+
+let logger = Logger(label: "com.andrewbennet.books")
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -23,7 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         launchManager.initialise()
 
-        DDLogInfo("Application launched")
+        logger.info("Application launched")
         upgradeManager.performNecessaryUpgradeActions()
 
         // Remote notifications are required for iCloud sync.
@@ -65,16 +67,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        DDLogInfo("Successfully registered for remote notifications")
+        logger.info("Successfully registered for remote notifications")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        DDLogError("Failed to register for remote notifications: \(error.localizedDescription)")
+        logger.error("Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        DDLogInfo("Application received remote notification")
+        logger.info("Application received remote notification")
         if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = self.syncCoordinator {
             syncCoordinator.respondToRemoteChangeNotification()
         }

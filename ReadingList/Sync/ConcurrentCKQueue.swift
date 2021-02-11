@@ -1,7 +1,6 @@
 import Foundation
 import CloudKit
-import CocoaLumberjackSwift
-import os.log
+import Logging
 
 class ConcurrentCKQueue {
     init() { }
@@ -19,14 +18,29 @@ class ConcurrentCKQueue {
         return operationQueue
     }()
 
-    func addOperation(_ operation: CKDatabaseOperation, qos: QualityOfService = .userInitiated) {
-        operation.database = privateDatabase
+    func addOperation(_ operation: Operation, qos: QualityOfService = .userInitiated) {
+        if let ckDatabaseOperation = operation as? CKDatabaseOperation {
+            ckDatabaseOperation.database = privateDatabase
+        }
         operation.qualityOfService = qos
         operationQueue.addOperation(operation)
+    }
+    
+    func addOperations(_ operations: [Operation], waitUntilFinished: Bool = false) {
+        for operation in operations {
+            if let ckDatabaseOperation = operation as? CKDatabaseOperation {
+                ckDatabaseOperation.database = privateDatabase
+            }
+        }
+        operationQueue.addOperations(operations, waitUntilFinished: waitUntilFinished)
     }
 
     func suspend() {
         operationQueue.isSuspended = true
+    }
+
+    func cancelAll() {
+        operationQueue.cancelAllOperations()
     }
 
     func resume() {
@@ -36,11 +50,11 @@ class ConcurrentCKQueue {
     func suspendCloudInterop(dueTo error: Error) -> Bool {
         guard let effectiveError = error as? CKError else { return false }
         guard let retryDelay = effectiveError.retryAfterSeconds else {
-            DDLogError("Error is not recoverable")
+            logger.error("Error is not recoverable")
             return false
         }
 
-        DDLogError("Error is recoverable. Will retry after \(retryDelay) seconds")
+        logger.error("Error is recoverable. Will retry after \(retryDelay) seconds")
         self.operationQueue.isSuspended = true
         // TODO Wrong queue, really
         cloudQueue.asyncAfter(deadline: .now() + retryDelay) {

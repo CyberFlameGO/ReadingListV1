@@ -56,6 +56,9 @@ packages:
   CocoaLumberjack:
     url: https://github.com/CocoaLumberjack/CocoaLumberjack.git
     minorVersion: 3.7.0
+  SwiftLog:
+    url: https://github.com/Apple/swift-log.git
+    minorVersion: 1.4.0
 
 fileGroups:
   - Debug/
@@ -104,6 +107,9 @@ targets:
       - package: Reachability
       - package: CocoaLumberjack
         product: CocoaLumberjackSwift
+        product: CocoaLumberjackSwiftLogBackend
+      - package: SwiftLog
+        product: Logging
       - package: ZIPFoundation
       - package: Firebase
         product: FirebaseCrashlytics

@@ -47,6 +47,8 @@ struct CloudSync: View {
             return "Log in to iCloud to enable iCloud Sync."
         }
     }
+    
+    @State var forceFullResyncSheetShowing = false
 
     var body: some View {
         SwiftUI.List {
@@ -68,6 +70,30 @@ struct CloudSync: View {
                 }) {
                     Text("Enable iCloud Sync")
                 }.disabled(accountStatus != .available)
+            }
+            if accountStatus == .available {
+                Section(
+                    header: HeaderText("Settings", inset: hostingSplitView.isSplit)
+                ) {
+                    Button("Force Full Resync") {
+                        forceFullResyncSheetShowing = true
+                    }.foregroundColor(Color(.systemRed))
+                    .actionSheet(isPresented: $forceFullResyncSheetShowing) {
+                        ActionSheet(
+                            title: Text("BLA"),
+                            message: Text("BLA"),
+                            buttons: [
+                                .destructive(Text("Resync")) {
+                                    guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
+                                        os_log(.error, "SyncCoordinator nil when attempting to force full iCloud sync")
+                                        return
+                                    }
+                                    syncCoordinator.forceFullResync()
+                                },
+                                .cancel()
+                            ])
+                    }
+                }
             }
         }.onAppear {
             updateAccountStatus()

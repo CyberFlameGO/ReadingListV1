@@ -1,7 +1,6 @@
 import Foundation
 import CloudKit
 import CoreData
-import CocoaLumberjackSwift
 import os.log
 
 struct SyncConstants {
@@ -74,13 +73,13 @@ extension CKRecordRepresentable {
 
     func setSystemAndIdentifierFields(from ckRecord: CKRecord) {
         guard remoteIdentifier == nil || remoteIdentifier == ckRecord.recordID.recordName else {
-            DDLogError("Attempted to update local object with remoteIdentifier \(remoteIdentifier!) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
-            DDLogError(Thread.callStackSymbols.joined(separator: "\n"))
+            logger.error("Attempted to update local object with remoteIdentifier \(remoteIdentifier!) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
+            logger.error("\(Thread.callStackSymbols.joined(separator: "\n"))")
             fatalError("Attempted to update local object from CKRecord with different remoteIdentifier")
         }
 
         if let existingCKRecordSystemFields = getSystemFieldsRecord(), existingCKRecordSystemFields.recordChangeTag == ckRecord.recordChangeTag {
-            DDLogDebug("CKRecord \(ckRecord.recordID.recordName) has same change tag as local book; no update made")
+            logger.debug("CKRecord \(ckRecord.recordID.recordName) has same change tag as local book; no update made")
             return
         }
 
@@ -104,10 +103,11 @@ extension CKRecordRepresentable {
     func update(from ckRecord: CKRecord, excluding excludedKeys: [String]?) {
         setSystemAndIdentifierFields(from: ckRecord)
 
+        // TODO Consider whether we should skip metadata updates if the change token is the same (as noticed in the above function call)
         // This book may have local changes which we don't want to overwrite with the values on the server.
         for key in Self.allCKRecordKeys {
             if let excludedKeys = excludedKeys, excludedKeys.contains(key) {
-                DDLogDebug("CKRecordKey '\(key)' not used to update local store due to pending local change")
+                logger.debug("CKRecordKey '\(key)' not used to update local store due to pending local change")
                 continue
             }
             setValue(ckRecord[key], for: key)

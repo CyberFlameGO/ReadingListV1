@@ -7,6 +7,8 @@ import ReadingList_Foundation
 import Reachability
 import PersistedPropertyWrapper
 import CocoaLumberjackSwift
+import CocoaLumberjackSwiftLogBackend
+import Logging
 
 class LaunchManager {
 
@@ -41,21 +43,22 @@ class LaunchManager {
     }
 
     private func initialiseLogging() {
-        let logLevel: DDLogLevel
+        let fileLogger = DDFileLogger()
+        fileLogger.rollingFrequency = 60 * 60 * 24
+        fileLogger.logFileManager.maximumNumberOfLogFiles = 7
+        DDLog.add(fileLogger)
+        DDLog.add(DDOSLogger())
+
+        let logLevel: Logging.Logger.Level
         switch BuildInfo.thisBuild.type {
         case .debug:
-            logLevel = .verbose
+            logLevel = .trace
         case .testFlight:
             logLevel = .debug
         case .appStore:
             logLevel = .info
         }
-        DDLog.add(DDOSLogger.sharedInstance, with: logLevel)
-
-        let fileLogger = DDFileLogger()
-        fileLogger.rollingFrequency = 60 * 60 * 24
-        fileLogger.logFileManager.maximumNumberOfLogFiles = 7
-        DDLog.add(fileLogger)
+        LoggingSystem.bootstrapWithCocoaLumberjack(for: DDLog.sharedInstance, defaultLogLevel: logLevel, loggingSynchronousAsOf: .error)
     }
 
     func handleApplicationDidBecomeActive() {

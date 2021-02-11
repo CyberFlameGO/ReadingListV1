@@ -1,7 +1,6 @@
 import CloudKit
 import CoreData
-import os.log
-import CocoaLumberjackSwift
+import Logging
 import ReadingList_Foundation
 
 extension Book: CKRecordRepresentable {
@@ -36,7 +35,7 @@ extension Book: CKRecordRepresentable {
         if recordName.starts(with: "mid:") {
             return NSPredicate(format: "%K == %@", #keyPath(Book.manualBookId), String(recordName.dropFirst(4)))
         }
-        DDLogError("Unexpected format of remote record ID: \(recordName)")
+        logger.error("Unexpected format of remote record ID: \(recordName)")
         return NSPredicate(boolean: false)
     }
 
@@ -46,6 +45,7 @@ extension Book: CKRecordRepresentable {
         case .title: return title
         case .subtitle: return subtitle
         case .googleBooksId: return googleBooksId
+        case .manualBookId: return manualBookId
         case .isbn13: return isbn13
         case .pageCount: return pageCount
         case .publicationDate: return publicationDate
@@ -65,7 +65,7 @@ extension Book: CKRecordRepresentable {
             do {
                 return try NSKeyedArchiver.archivedData(withRootObject: authors, requiringSecureCoding: true) as NSData
             } catch {
-                DDLogError("Error decoding author data: \(error.localizedDescription)")
+                logger.error("Error decoding author data: \(error.localizedDescription)")
                 return nil
             }
         case .coverImage:
@@ -85,6 +85,7 @@ extension Book: CKRecordRepresentable {
             }
         case .subtitle: subtitle = value as? String
         case .googleBooksId: googleBooksId = value as? String
+        case .manualBookId: manualBookId = value as? String
         case .isbn13: isbn13 = value as? Int64
         case .pageCount: pageCount = value?.asInt32
         case .publicationDate: publicationDate = value as? Date
@@ -116,7 +117,7 @@ extension Book: CKRecordRepresentable {
                     authors = authorsFromData
                 }
             } catch {
-                DDLogError("Error decoding author data: \(error.localizedDescription)")
+                logger.error("Error decoding author data: \(error.localizedDescription)")
                 authors = []
             }
         case .coverImage:
