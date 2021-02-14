@@ -121,6 +121,7 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
 
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChangeProducingSnapshot snapshot: NSDiffableDataSourceSnapshot<String, NSManagedObjectID>, withChangedObjects changedObjects: [NSManagedObjectID]) {
         apply(snapshot, animatingDifferences: true)
+        
         onContentChanged()
     }
 }

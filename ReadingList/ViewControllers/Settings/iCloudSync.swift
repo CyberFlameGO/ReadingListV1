@@ -47,7 +47,7 @@ struct CloudSync: View {
             return "Log in to iCloud to enable iCloud Sync."
         }
     }
-    
+
     @State var forceFullResyncSheetShowing = false
 
     var body: some View {

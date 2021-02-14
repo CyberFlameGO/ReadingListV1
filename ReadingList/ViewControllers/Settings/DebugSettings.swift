@@ -131,7 +131,7 @@ struct LogFiles: View {
     @State var filePaths = [URL]()
     @State var fileSizes = [URL: Int64]()
     static let sizeFormatter = ByteCountFormatter()
-    
+
     var body: some View {
         SwiftUI.List {
             ForEach(filePaths, id: \.self) { path in

@@ -25,7 +25,7 @@ class ConcurrentCKQueue {
         operation.qualityOfService = qos
         operationQueue.addOperation(operation)
     }
-    
+
     func addOperations(_ operations: [Operation], waitUntilFinished: Bool = false) {
         for operation in operations {
             if let ckDatabaseOperation = operation as? CKDatabaseOperation {

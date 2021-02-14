@@ -107,6 +107,7 @@ targets:
       - package: Reachability
       - package: CocoaLumberjack
         product: CocoaLumberjackSwift
+      - package: CocoaLumberjack
         product: CocoaLumberjackSwiftLogBackend
       - package: SwiftLog
         product: Logging

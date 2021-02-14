@@ -4,12 +4,12 @@ import CoreData
 struct ManagedObjectContextSyncHelper {
     let entityTypes: [NSEntityDescription]
     let managedObjectContext: NSManagedObjectContext
-    
+
     init(managedObjectContext: NSManagedObjectContext, entityTypes: [NSEntityDescription]) {
         self.entityTypes = entityTypes
         self.managedObjectContext = managedObjectContext
     }
-    
+
     func eraseSyncMetadata() {
         for entity in entityTypes {
             let batchUpdate = NSBatchUpdateRequest(entity: entity)
