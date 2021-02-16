@@ -1,6 +1,5 @@
 import Foundation
 import Promises
-import ReadingList_Foundation
 import os.log
 
 struct GoogleBooksApi {

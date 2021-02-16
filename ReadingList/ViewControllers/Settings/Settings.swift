@@ -58,7 +58,6 @@ struct Settings: View {
                         badgeOnBackupRow = AutoBackupManager.shared.cannotRunScheduledAutoBackups
                     }
                 SettingsCell(.icloudSync, title: "iCloud Sync", imageName: "icloud.fill", color: .icloudBlue)
-                SettingsCell(.privacy, title: "Privacy", imageName: "lock.fill", color: Color(.darkGray))
             }
         }.listStyle(GroupedListStyle())
         .navigationBarTitle("Settings")

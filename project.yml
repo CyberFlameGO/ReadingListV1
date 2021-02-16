@@ -6,11 +6,9 @@ options:
   indentWith: 4
   bundleIdPrefix: com.andrewbennet
   groupOrdering: 
-    - order: [ReadingList, ReadingList_UITests, ReadingList_UnitTests, ReadingListWidget, Packages, Debug, fastlane]
+    - order: [ReadingList, ReadingList_Foundation, ReadingList_UITests, ReadingList_UnitTests, ReadingListWidget, Debug, fastlane]
 
 packages:
-  ReadingList_Foundation:
-    path: ReadingList_Foundation
   Cosmos:
     url: https://github.com/evgenyneu/Cosmos.git
     minorVersion: 23.0.0
@@ -75,6 +73,7 @@ targets:
       - path: ReadingList
         excludes:
           - Debug
+      - path: ReadingList_Foundation
       - path: ReadingListWidget/WidgetKind.swift
     scheme:
       testTargets:
@@ -93,7 +92,6 @@ targets:
     dependencies:
       - sdk: StoreKit.framework
       - target: ReadingListWidget
-      - package: ReadingList_Foundation
       - package: Cosmos
       - package: SwiftyStoreKit
       - package: Eureka
@@ -174,9 +172,11 @@ targets:
     sources:
       - path: ReadingList_UITests
       - path: ReadingList/Api/GoogleBooksRequest.swift
+      - path: ReadingList_Foundation/LanguageIso639_1.swift
     dependencies:
       - target: ReadingList
       - package: Swifter
+      - package: Promises
     scheme:
       testTargets:
         - ReadingList_UITests

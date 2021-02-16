@@ -1,13 +1,18 @@
 {
   "default": {
     "title": {
-      "color": "#444",
-      "font": "./GillSans.ttc",
-      "font_size": 145
-      
+      "color": "#000",
+      "font": "./SF-Pro-Text-Semibold.otf",
+      "font_size": 80
     },
-    "background": "./background.jpg",
-    "padding": 100
+    "keyword": {
+      "color": "#000",
+      "font": "./SF-Pro-Text-Bold.otf",
+      "font_size": 128
+    },
+    "stack_title": true,
+    "background": "./background.png",
+    "padding": "20x50"
   },
   "data": [
     {

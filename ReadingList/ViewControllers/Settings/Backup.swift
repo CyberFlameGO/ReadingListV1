@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import ReadingList_Foundation
 import os.log
 import SVProgressHUD
 

@@ -1,6 +1,5 @@
 import UIKit
 import CoreData
-import ReadingList_Foundation
 import os.log
 
 final class BookTable: UITableViewController { //swiftlint:disable:this type_body_length

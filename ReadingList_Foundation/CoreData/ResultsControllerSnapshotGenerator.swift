@@ -5,7 +5,7 @@ import CoreData
  A delegate protocol that describes the functions that will be called by the associated `ResultsControllerSnapshotGenerator` when the fetch results have changed
  and those changes have been mapped onto a new `NSDiffableDataSourceSnapshot`.
  */
-public protocol ResultsControllerSnapshotGeneratorDelegate: class {
+public protocol ResultsControllerSnapshotGeneratorDelegate: AnyObject {
     associatedtype SectionType: Hashable
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChangeProducingSnapshot snapshot: NSDiffableDataSourceSnapshot<SectionType, NSManagedObjectID>, withChangedObjects changedObjects: [NSManagedObjectID])
 }

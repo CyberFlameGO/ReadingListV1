@@ -1,7 +1,6 @@
 import Foundation
 import CoreData
 import PersistedPropertyWrapper
-import ReadingList_Foundation
 
 @objc(List)
 class List: NSManagedObject {

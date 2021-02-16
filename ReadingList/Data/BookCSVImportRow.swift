@@ -1,6 +1,5 @@
 import Foundation
 import Regex
-import ReadingList_Foundation
 
 /// Holds data from a CSV row relating to a book, for import.
 struct BookCSVImportRow {

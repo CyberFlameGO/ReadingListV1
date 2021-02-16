@@ -30,7 +30,7 @@ class BackupFrequency: UITableViewController {
     }
 }
 
-protocol BackupFrequencyDelegate: class {
+protocol BackupFrequencyDelegate: AnyObject {
     func backupFrequencyDidChange()
 }
 

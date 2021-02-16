@@ -1,7 +1,7 @@
 import Foundation
 import CHCSVParser
 
-public protocol CSVParserDelegate: class {
+public protocol CSVParserDelegate: AnyObject {
     func headersRead(_ headers: [String]) -> Bool
     func lineParseSuccess(_ values: [String: String])
     func lineParseError()

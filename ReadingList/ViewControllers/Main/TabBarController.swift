@@ -64,17 +64,19 @@ final class TabBarController: UITabBarController {
         hostingSplitView.isSplit = !settings.isCollapsed
 
         settingsSplitViewObserver = hostingSplitView.$selectedCell.sink { type in
-            func hostingDetail<T>(_ view: T) -> UIViewController where T: View {
-                UIHostingController(rootView: view.environmentObject(hostingSplitView)).inNavigationController()
+            func hostingDetail<T>(_ view: T, title: String? = nil) -> UIViewController where T: View {
+                let hostingController = UIHostingController(rootView: view.environmentObject(hostingSplitView))
+                hostingController.navigationItem.title = title
+                return hostingController.inNavigationController()
             }
 
             let destination: UIViewController
             switch type {
             case .about: destination = aboutVc
-            case .appearance: destination = hostingDetail(Appearance())
-            case .appIcon: destination = hostingDetail(AppIcon())
-            case .general: destination = hostingDetail(General())
-            case .tip: destination = hostingDetail(Tip())
+            case .appearance: destination = hostingDetail(Appearance(), title: "Appearance")
+            case .appIcon: destination = hostingDetail(AppIcon(), title: "App Icon")
+            case .general: destination = hostingDetail(General(), title: "General")
+            case .tip: destination = hostingDetail(Tip(), title: "Tip")
             case .importExport: destination = UIStoryboard.ImportExport.instantiateRoot()
             case .backup: destination = UIStoryboard.Backup.instantiateRoot()
             case .icloudSync: destination = hostingDetail(CloudSync())

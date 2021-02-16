@@ -1,6 +1,5 @@
 import Foundation
 import CoreData
-import ReadingList_Foundation
 
 enum BooksModelVersion: String, CaseIterable {
     case version5 = "books_5"

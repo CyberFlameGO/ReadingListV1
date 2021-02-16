@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import ReadingList_Foundation
 
 class StartFinishButton: BorderedButton {
     enum ButtonState {

@@ -3,7 +3,6 @@ import UIKit
 import SVProgressHUD
 import CoreData
 import Promises
-import ReadingList_Foundation
 
 final class SearchOnline: UITableViewController {
 

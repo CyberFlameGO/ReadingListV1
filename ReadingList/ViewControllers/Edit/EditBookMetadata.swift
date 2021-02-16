@@ -4,7 +4,6 @@ import ImageRow
 import UIKit
 import CoreData
 import SVProgressHUD
-import ReadingList_Foundation
 
 final class EditBookMetadata: FormViewController {
 

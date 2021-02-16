@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import WhatsNewKit
-import ReadingList_Foundation
 
 struct FirstOpenScreenProvider {
     func build(onDismiss: (() -> Void)? = nil) -> UIViewController {

@@ -1,4 +1,3 @@
-import ReadingList_Foundation
 import PersistedPropertyWrapper
 
 struct GeneralSettings {

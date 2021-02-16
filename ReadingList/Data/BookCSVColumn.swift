@@ -1,5 +1,4 @@
 import Foundation
-import ReadingList_Foundation
 
 /// Enumerates the columns in the native Reading List CSV export.  Note that lists are to be semicolon separated, any any semicolon in an item will be escaped to `\;`,
 /// and any backslash will be escaped to `\\`.

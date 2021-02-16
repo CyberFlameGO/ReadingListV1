@@ -1,7 +1,6 @@
 import UIKit
 import AVFoundation
 import SVProgressHUD
-import ReadingList_Foundation
 import CoreData
 import os.log
 

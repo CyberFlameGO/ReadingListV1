@@ -1,6 +1,5 @@
 import Foundation
 import CoreData
-import ReadingList_Foundation
 import os.log
 import CloudKit
 

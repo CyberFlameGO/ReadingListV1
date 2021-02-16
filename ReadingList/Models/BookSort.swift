@@ -1,5 +1,4 @@
 import Foundation
-import ReadingList_Foundation
 import PersistedPropertyWrapper
 
 @objc public enum BookSort: Int16, CaseIterable, CustomStringConvertible, Codable {

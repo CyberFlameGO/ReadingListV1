@@ -1,9 +1,8 @@
 import Foundation
 import CoreData
 import UIKit
-import ReadingList_Foundation
 
-protocol ListBookDataSource: class, UITableViewEmptyDetectingDataSource {
+protocol ListBookDataSource: AnyObject, UITableViewEmptyDetectingDataSource {
     func updateData(animate: Bool)
     var controller: NSFetchedResultsController<ListItem> { get set }
     var list: List { get }
@@ -115,7 +114,11 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
     }
 
     func updateData(animate: Bool) {
-        apply(controller.snapshot(), animatingDifferences: animate)
+        updateData(controller.snapshot(), animate: animate)
+    }
+    
+    func updateData(_ snapshot: NSDiffableDataSourceSnapshot<String, NSManagedObjectID>, animate: Bool) {
+        apply(snapshot, animatingDifferences: animate)
         onContentChanged()
     }
 

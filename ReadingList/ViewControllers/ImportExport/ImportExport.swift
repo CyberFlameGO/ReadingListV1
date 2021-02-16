@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import SVProgressHUD
 import CoreData
-import ReadingList_Foundation
 
 final class ImportExport: UITableViewController {
 

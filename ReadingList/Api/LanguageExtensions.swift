@@ -1,5 +1,4 @@
 import Foundation
-import ReadingList_Foundation
 
 extension LanguageIso639_1 {
     // List formed by examining the results count for a Google Books search call with the langRestrict paramater;

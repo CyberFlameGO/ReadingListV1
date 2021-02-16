@@ -3,7 +3,6 @@ import StoreKit
 import Firebase
 import FirebaseCrashlytics
 import PersistedPropertyWrapper
-import ReadingList_Foundation
 
 class UserEngagement {
 

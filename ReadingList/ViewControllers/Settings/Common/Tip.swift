@@ -29,7 +29,6 @@ struct Tip: View {
                 Spacer()
             }
         }
-        .navigationBarTitle("Tip")
     }
 }
 

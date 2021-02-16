@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import ReadingList_Foundation
 
 class BookTableViewCell: UITableViewCell {
     @IBOutlet private weak var titleLabel: UILabel!

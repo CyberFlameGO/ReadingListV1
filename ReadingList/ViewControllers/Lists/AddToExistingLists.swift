@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import CoreData
-import ReadingList_Foundation
 
 final class AddToExistingLists: UITableViewController {
     var resultsController: NSFetchedResultsController<List>!

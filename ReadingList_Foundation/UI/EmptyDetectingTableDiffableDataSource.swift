@@ -7,7 +7,7 @@ public protocol UITableViewEmptyDetectingDataSource: UITableViewDataSource {
     var emptyDetectionDelegate: UITableViewEmptyDetectingDataSourceDelegate? { get set }
 }
 
-public protocol UITableViewEmptyDetectingDataSourceDelegate: class {
+public protocol UITableViewEmptyDetectingDataSourceDelegate: AnyObject {
     func tableDidBecomeEmpty()
     func tableDidBecomeNonEmpty()
 }

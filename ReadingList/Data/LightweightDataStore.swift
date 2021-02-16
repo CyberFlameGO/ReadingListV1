@@ -1,6 +1,5 @@
 import Foundation
 import PersistedPropertyWrapper
-import ReadingList_Foundation
 
 struct LightweightDataStore {
     private init() {}

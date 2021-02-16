@@ -1,5 +1,4 @@
 import Foundation
-import ReadingList_Foundation
 
 struct BuildInfo: Codable {
     enum BuildType: Int, Codable {

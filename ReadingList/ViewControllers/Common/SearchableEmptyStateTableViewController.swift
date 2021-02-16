@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import CoreData
 import os.log
-import ReadingList_Foundation
 
 class UITableViewSearchableEmptyStateManager: UITableViewEmptyStateManager {
 

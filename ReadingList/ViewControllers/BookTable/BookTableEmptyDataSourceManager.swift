@@ -1,4 +1,3 @@
-import ReadingList_Foundation
 import UIKit
 
 final class BookTableEmptyDataSourceManager: UITableViewSearchableEmptyStateManager {

@@ -3,7 +3,19 @@ xcversion(version: "12.2")
 
 platform :ios do
 
-  desc "Configures Fabric, builds the project file and sets the build number from git."
+  lane :deploy do
+    ensure_git_status_clean
+    increment_build_number(build_number: number_of_commits)
+    build_app(
+        project: "ReadingList.xcodeproj",
+        scheme: "ReadingList"
+    )
+    upload_build
+    tag_build
+    increment_build_number(build_number: 1)
+  end
+
+  desc "Builds the project file and sets the build number from git."
   lane :preprocess do
     sh "cd .. && mint run yonaskolb/xcodegen"
     increment_build_number(build_number: number_of_commits)
@@ -51,7 +63,7 @@ platform :ios do
     add_git_tag(
       tag: build_tag
     )
-    sh("git push https://AndrewBennet:$GITHUB_TOKEN@github.com/AndrewBennet/ReadingList.git tag " + build_tag)
+    sh("git push git@github.com:AndrewBennet/ReadingList.git tag " + build_tag)
   end
 
   lane :release do |options|

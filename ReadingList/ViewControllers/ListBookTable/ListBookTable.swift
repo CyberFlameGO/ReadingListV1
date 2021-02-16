@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import CoreData
-import ReadingList_Foundation
 
 final class ListBookTable: UITableViewController {
 
@@ -10,7 +9,7 @@ final class ListBookTable: UITableViewController {
     private var ignoreNotifications = false
 
     private var searchController: UISearchController!
-    private var dataSource: ListBookDataSource!
+    private var dataSource: ListBookDiffableDataSource!
     private var emptyStateManager: ListBookTableEmptyDataSetManager!
 
     private var listNameField: UITextField? {
@@ -176,10 +175,24 @@ final class ListBookTable: UITableViewController {
         guard !ignoreNotifications else { return }
         guard let userInfo = notification.userInfo else { return }
 
-        if let deletedObjects = userInfo[NSDeletedObjectsKey] as? NSSet, deletedObjects.contains(list!) {
+        if let deletedObjects = userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>, deletedObjects.contains(list!) {
             // If the list was deleted, pop back. This can't happen through any normal means at the moment.
             navigationController?.popViewController(animated: false)
             return
+        }
+
+        // The fetched results controller only detects changes to the ListItem, not only related objects such as the Book.
+        // This means that book changes don't get reflected in this screen straight-away. To address this, check each save
+        // to see whether any updated objects were books which have ListItems which associate with this list.
+        if let updatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+            let updatedBooks = updatedObjects.compactMap { $0 as? Book }
+            if !updatedBooks.isEmpty {
+                var snapshot = self.dataSource.controller.snapshot()
+                for updatedBook in updatedBooks {
+                    snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
+                }
+                self.dataSource.updateData(snapshot, animate: false)
+            }
         }
 
         // Repopulate the list names cache

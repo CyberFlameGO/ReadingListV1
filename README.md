@@ -16,7 +16,7 @@
 </a>
 
 ## Requirements
- - Xcode 12.2
+ - Xcode 12.4
 
 ## Dependencies
 

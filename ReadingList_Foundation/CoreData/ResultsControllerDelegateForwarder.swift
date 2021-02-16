@@ -30,7 +30,7 @@ class ResultsControllerDelegateForwarder: NSObject, NSFetchedResultsControllerDe
  this protocol exists only so that a `ResultsControllerDelegateForwarder` can forward the delegate events to _any_ class, including
  a class with generic arguments, which is not possible otherwise.
  */
-protocol ResultsControllerDelegateForwarderReceiver: class {
+protocol ResultsControllerDelegateForwarderReceiver: AnyObject {
     func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>)
 
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange anObject: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?)

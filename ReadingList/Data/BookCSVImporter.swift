@@ -1,7 +1,6 @@
 import Foundation
 import CoreData
 import Promises
-import ReadingList_Foundation
 import os.log
 
 struct BookCSVImportSettings: Codable {

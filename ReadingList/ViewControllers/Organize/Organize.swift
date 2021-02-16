@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import CoreData
-import ReadingList_Foundation
 
 extension List: Sortable {
     public var sortIndex: Int32 {

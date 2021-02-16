@@ -81,7 +81,6 @@ struct Appearance: View {
                 }
             }
         }.possiblyInsetGroupedListStyle(inset: inset)
-        .navigationBarTitle("Appearance")
     }
 }
 

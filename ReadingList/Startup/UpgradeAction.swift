@@ -1,7 +1,6 @@
 import Foundation
 import CoreSpotlight
 import os.log
-import ReadingList_Foundation
 
 struct UpgradeAction {
     let id: Int

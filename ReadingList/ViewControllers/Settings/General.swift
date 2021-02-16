@@ -1,5 +1,4 @@
 import SwiftUI
-import ReadingList_Foundation
 
 class GeneralSettingsObservable: ObservableObject {
     @Published var addBooksToTop: Bool = GeneralSettings.addBooksToTopOfCustom {
@@ -104,7 +103,6 @@ struct General: View {
             }
         }
         .possiblyInsetGroupedListStyle(inset: hostingSplitView.isSplit)
-        .navigationBarTitle("General", displayMode: .inline)
     }
 }
 

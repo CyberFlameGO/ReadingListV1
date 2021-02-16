@@ -43,7 +43,7 @@ class Screenshots: XCTestCase {
 
         if !isIpad {
             // go back
-            app.navigationBars["The Color Purple"].buttons["Finished"].tap()
+            app.navigationBars.firstMatch.buttons["Finished"].tap()
         }
         if isIpad {
             app.tables.staticTexts["The Great Gatsby"].tap()

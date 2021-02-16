@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import CoreData
-import ReadingList_Foundation
 
 final class ManageLists: UITableViewController {
     var books: [Book]!

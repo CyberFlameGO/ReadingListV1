@@ -12,7 +12,6 @@ struct AppIcon: View {
             AppIconCellRow(alternateIconName: "Classic", name: "Classic", selectedIconName: $selectedIconName)
             AppIconCellRow(alternateIconName: "ClassicWhite", name: "Classic (White)", selectedIconName: $selectedIconName)
         }.possiblyInsetGroupedListStyle(inset: hostingSplitView.isSplit)
-        .navigationBarTitle("App Icon")
     }
 }
 

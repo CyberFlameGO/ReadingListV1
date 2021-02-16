@@ -1,5 +1,4 @@
 import Foundation
-import ReadingList_Foundation
 
 extension Book {
     @objc func validateAuthors(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>) throws {

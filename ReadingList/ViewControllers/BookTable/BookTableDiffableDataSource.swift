@@ -1,4 +1,3 @@
-import ReadingList_Foundation
 import UIKit
 import CoreData
 

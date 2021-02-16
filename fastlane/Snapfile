@@ -1,11 +1,11 @@
 devices([
-	#"iPhone SE (1st generation)",
-	#"iPhone 8",
-	#"iPhone 8 Plus",
-	#"iPhone 11 Pro",
-	#"iPhone 11 Pro Max",
-	#"iPad Pro (9.7-inch)",
-	#"iPad Pro (12.9-inch) (3rd generation)",
+	"iPhone SE (1st generation)",
+	"iPhone 8",
+	"iPhone 8 Plus",
+	"iPhone 11 Pro",
+	"iPhone 11 Pro Max",
+	"iPad Pro (9.7-inch)",
+	"iPad Pro (12.9-inch) (3rd generation)",
 	"iPad Pro (12.9-inch) (2nd generation)"
 ])
 languages([
@@ -13,7 +13,7 @@ languages([
 ])
 scheme("ReadingList_UITests")
 project("ReadingList.xcodeproj")
-ios_version("14.0")
+ios_version("14.2")
 #clear_previous_screenshots(true)
 reinstall_app(true)
 concurrent_simulators(false)
