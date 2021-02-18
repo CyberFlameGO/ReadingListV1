@@ -35,6 +35,10 @@ class ConcurrentCKQueue {
         operationQueue.addOperations(operations, waitUntilFinished: waitUntilFinished)
     }
 
+    func addBlock(_ block: @escaping () -> Void) {
+        operationQueue.addOperation(BlockOperation(block: block))
+    }
+
     func suspend() {
         operationQueue.isSuspended = true
     }
@@ -45,22 +49,5 @@ class ConcurrentCKQueue {
 
     func resume() {
         operationQueue.isSuspended = false
-    }
-
-    func suspendCloudInterop(dueTo error: Error) -> Bool {
-        guard let effectiveError = error as? CKError else { return false }
-        guard let retryDelay = effectiveError.retryAfterSeconds else {
-            logger.error("Error is not recoverable")
-            return false
-        }
-
-        logger.error("Error is recoverable. Will retry after \(retryDelay) seconds")
-        self.operationQueue.isSuspended = true
-        // TODO Wrong queue, really
-        cloudQueue.asyncAfter(deadline: .now() + retryDelay) {
-            self.operationQueue.isSuspended = false
-        }
-
-        return true
     }
 }

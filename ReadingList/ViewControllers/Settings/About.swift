@@ -53,7 +53,7 @@ struct About: View {
                          // Re-provide the environment object, otherwise we seem to get trouble
                          // when the containing hosting VC gets removed from the window
                 ).navigating(to: Attributions().environmentObject(hostingSplitView))
-                
+
                 IconCell("Privacy Policy",
                          imageName: "lock.fill",
                          backgroundColor: Color(.darkGray)

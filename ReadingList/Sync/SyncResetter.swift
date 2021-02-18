@@ -1,7 +1,7 @@
 import Foundation
 import CoreData
 
-struct ManagedObjectContextSyncHelper {
+struct SyncResetter {
     let entityTypes: [NSEntityDescription]
     let managedObjectContext: NSManagedObjectContext
 

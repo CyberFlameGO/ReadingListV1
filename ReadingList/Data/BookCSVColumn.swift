@@ -102,8 +102,8 @@ extension BookCSVColumn: CsvColumn {
             // We want to return a cell value like:
             //      List A (19); List B (3); List C (4)
             // Increment the sort value to make them 1-based.
-            return book.listItems.sorted(byAscending: { $0.list.name }).map {
-                "\($0.list.name) (\($0.sort + 1))"
+            return book.listItems.filter { $0.list != nil && $0.book != nil }.sorted(byAscending: { $0.list!.name }).map {
+                "\($0.list!.name) (\($0.sort + 1))"
             }.semicolonSeparated()
         }
     }

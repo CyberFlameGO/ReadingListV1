@@ -48,8 +48,6 @@ struct CloudSync: View {
         }
     }
 
-    @State var forceFullResyncSheetShowing = false
-
     var body: some View {
         SwiftUI.List {
             Section(
@@ -75,24 +73,7 @@ struct CloudSync: View {
                 Section(
                     header: HeaderText("Settings", inset: hostingSplitView.isSplit)
                 ) {
-                    Button("Force Full Resync") {
-                        forceFullResyncSheetShowing = true
-                    }.foregroundColor(Color(.systemRed))
-                    .actionSheet(isPresented: $forceFullResyncSheetShowing) {
-                        ActionSheet(
-                            title: Text("BLA"),
-                            message: Text("BLA"),
-                            buttons: [
-                                .destructive(Text("Resync")) {
-                                    guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
-                                        os_log(.error, "SyncCoordinator nil when attempting to force full iCloud sync")
-                                        return
-                                    }
-                                    syncCoordinator.forceFullResync()
-                                },
-                                .cancel()
-                            ])
-                    }
+                    NavigationLink("Advanced", destination: CloudSyncAdvanced())
                 }
             }
         }.onAppear {

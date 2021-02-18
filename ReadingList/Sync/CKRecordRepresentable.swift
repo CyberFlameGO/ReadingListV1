@@ -24,6 +24,7 @@ protocol CKRecordRepresentable: NSManagedObject {
 
     func getValue(for key: String) -> CKRecordValueProtocol?
     func setValue(_ value: CKRecordValueProtocol?, for ckRecordKey: String)
+    func setRelationshipResolvingInfo(_ record: CKRecord)
 }
 
 extension CKRecordRepresentable {
@@ -112,5 +113,7 @@ extension CKRecordRepresentable {
             }
             setValue(ckRecord[key], for: key)
         }
+
+        setRelationshipResolvingInfo(ckRecord)
     }
 }

@@ -20,7 +20,7 @@ struct PersistentHistoryFetcher {
             }
             historyResult = historyExecutionResult
         } catch {
-            os_log(.error, "Failed to fetch transaction history")
+            logger.error("Failed to delete persistent history")
             return []
         }
         return historyResult.result as! [NSPersistentHistoryTransaction]
@@ -34,7 +34,7 @@ struct PersistentHistoryFetcher {
 
     private func fetchRequest(limit: Int = 0) -> NSFetchRequest<NSFetchRequestResult>? {
         guard let fetchRequest = NSPersistentHistoryTransaction.fetchRequest else {
-            os_log(.error, "NSPersistentHistoryTransaction.fetchRequest was nil")
+            logger.error("Failed to delete persistent history")
             return nil
         }
 
@@ -55,6 +55,7 @@ struct PersistentHistoryFetcher {
         do {
             try context.execute(deletionRequest)
         } catch {
+            logger.error("Failed to delete persistent history")
             assertionFailure("Failed to delete persistent history")
         }
     }

@@ -19,7 +19,7 @@ extension ListItem: Sortable {
 
 extension ListBookDataSource {
     func getBook(at indexPath: IndexPath) -> Book {
-        return controller.object(at: indexPath).book
+        return controller.object(at: indexPath).book!
     }
 
     func canMoveRow() -> Bool {
@@ -89,7 +89,9 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
         }
         super.init(tableView: tableView) { _, indexPath, _ in
             let cell = tableView.dequeue(BookTableViewCell.self, for: indexPath)
-            let book = wrappedController.wrappedValue.object(at: indexPath).book
+            guard let book = wrappedController.wrappedValue.object(at: indexPath).book else {
+                fatalError("Missing book")
+            }
             cell.configureFrom(book, includeReadDates: false)
             return cell
         }
@@ -116,7 +118,7 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
     func updateData(animate: Bool) {
         updateData(controller.snapshot(), animate: animate)
     }
-    
+
     func updateData(_ snapshot: NSDiffableDataSourceSnapshot<String, NSManagedObjectID>, animate: Bool) {
         apply(snapshot, animatingDifferences: animate)
         onContentChanged()
@@ -124,7 +126,7 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
 
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChangeProducingSnapshot snapshot: NSDiffableDataSourceSnapshot<String, NSManagedObjectID>, withChangedObjects changedObjects: [NSManagedObjectID]) {
         apply(snapshot, animatingDifferences: true)
-        
+
         onContentChanged()
     }
 }

@@ -1,7 +1,6 @@
 import CloudKit
 import CoreData
 import Logging
-import ReadingList_Foundation
 
 extension List: CKRecordRepresentable {
     static let ckRecordType = "List"
@@ -57,6 +56,8 @@ extension List: CKRecordRepresentable {
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return ListCKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }
+
+    func setRelationshipResolvingInfo(_ record: CKRecord) { }
 }
 
 extension CKRecord {

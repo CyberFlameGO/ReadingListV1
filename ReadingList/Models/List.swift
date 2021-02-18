@@ -15,7 +15,7 @@ class List: NSManagedObject {
 
     /** The ordered array of books within this list. If just a count is required, use items.count instead. */
     var books: [Book] {
-        items.sorted(byAscending: \.sort).map(\.book)
+        items.sorted(byAscending: \.sort).compactMap(\.book)
     }
 
     convenience init(context: NSManagedObjectContext, name: String) {
@@ -33,8 +33,10 @@ class List: NSManagedObject {
     }
 
     func removeBooks(_ books: Set<Book>) {
-        for item in items where books.contains(item.book) {
-            item.delete()
+        for item in items {
+            if let book = item.book, books.contains(book) {
+                item.delete()
+            }
         }
     }
 

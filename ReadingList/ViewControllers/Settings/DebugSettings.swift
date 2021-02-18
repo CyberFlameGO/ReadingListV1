@@ -172,14 +172,25 @@ struct LogFiles: View {
 struct LogFile: View {
     let url: URL
     @State private var fileContents: String?
+    @State var shareLogFileSheetIsPresented = false
 
     var body: some View {
         Group {
             if let fileContents = fileContents {
-                ScrollView(.vertical, showsIndicators: true) {
-                    Text(fileContents)
-                        .font(.system(.caption, design: .monospaced))
-                        .multilineTextAlignment(.leading)
+                if #available(iOS 14.0, *) {
+                    ScrollingFileContents(fileContents: fileContents)
+                        .sheet(isPresented: $shareLogFileSheetIsPresented) {
+                            ActivityViewController(activityItems: [fileContents])
+                        }
+                        .toolbar {
+                            Button(action: {
+                                shareLogFileSheetIsPresented = true
+                            }, label: {
+                                Image(systemName: "square.and.arrow.up")
+                            })
+                        }
+                } else {
+                    ScrollingFileContents(fileContents: fileContents)
                 }
             } else {
                 ProgressSpinnerView(isAnimating: .constant(true), style: .medium)
@@ -191,6 +202,17 @@ struct LogFile: View {
             self.fileContents = fileContents
         }
 
+    }
+}
+struct ScrollingFileContents: View {
+    let fileContents: String
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            Text(fileContents)
+                .font(.system(.caption, design: .monospaced))
+                .multilineTextAlignment(.leading)
+        }
     }
 }
 

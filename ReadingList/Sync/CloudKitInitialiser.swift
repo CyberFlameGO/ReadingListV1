@@ -5,6 +5,7 @@ import Logging
 
 class CloudKitInitialiser {
     private let cloudOperationQueue: ConcurrentCKQueue
+    weak var coordinator: SyncCoordinator?
 
     init(cloudOperationQueue: ConcurrentCKQueue) {
         self.cloudOperationQueue = cloudOperationQueue
@@ -19,15 +20,17 @@ class CloudKitInitialiser {
     static let privateSubscriptionId = "\(SyncConstants.zoneID.zoneName).subscription"
 
     func prepareCloudEnvironment(completion: @escaping () -> Void) {
-        self.createCustomZoneIfNeeded()
-        self.cloudOperationQueue.operationQueue.waitUntilAllOperationsAreFinished()
-        guard self.createdCustomZone else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.createCustomZoneIfNeeded()
+            self.cloudOperationQueue.operationQueue.waitUntilAllOperationsAreFinished()
+            guard self.createdCustomZone else { return }
 
-        self.createPrivateSubscriptionsIfNeeded()
-        self.cloudOperationQueue.operationQueue.waitUntilAllOperationsAreFinished()
-        guard self.createdPrivateSubscription else { return }
+            self.createPrivateSubscriptionsIfNeeded()
+            self.cloudOperationQueue.operationQueue.waitUntilAllOperationsAreFinished()
+            guard self.createdPrivateSubscription else { return }
 
-        completion()
+            completion()
+        }
     }
 
     private func createCustomZoneIfNeeded() {
@@ -46,8 +49,16 @@ class CloudKitInitialiser {
 
             if let error = error {
                 logger.error("Failed to create custom CloudKit zone: \(String(describing: error))")
-                if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
+                guard let ckError = error as? CKError else {
+                    self.coordinator?.handleUnexpectedResponse()
+                    return
+                }
+                if let retryAfter = ckError.retryAfterSeconds {
+                    self.cloudOperationQueue.suspend()
                     self.createCustomZoneIfNeeded()
+                    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + retryAfter) {
+                        self.cloudOperationQueue.resume()
+                    }
                 }
             } else {
                 logger.info("Zone created successfully")
@@ -67,8 +78,17 @@ class CloudKitInitialiser {
             if let error = error {
                 logger.error("Failed to check for custom zone existence: \(String(describing: error))")
 
-                if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
+                guard let ckError = error as? CKError else {
+                    self.coordinator?.handleUnexpectedResponse()
+                    return
+                }
+
+                if let retryAfter = ckError.retryAfterSeconds {
+                    self.cloudOperationQueue.suspend()
                     self.checkCustomZone()
+                    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + retryAfter) {
+                        self.cloudOperationQueue.resume()
+                    }
                 } else {
                     logger.error("Irrecoverable error when fetching custom zone, assuming it doesn't exist: \(String(describing: error))")
 
@@ -109,9 +129,17 @@ class CloudKitInitialiser {
 
             if let error = error {
                 logger.error("Failed to create private CloudKit subscription: \(String(describing: error))")
+                guard let ckError = error as? CKError else {
+                    self.coordinator?.handleUnexpectedResponse()
+                    return
+                }
 
-                if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
-                    self.createPrivateSubscriptionsIfNeeded()
+                if let retryAfter = ckError.retryAfterSeconds {
+                    self.cloudOperationQueue.suspend()
+                    self.checkCustomZone()
+                    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + retryAfter) {
+                        self.createPrivateSubscriptionsIfNeeded()
+                    }
                 }
             } else {
                 logger.info("Private subscription created successfully")
@@ -130,9 +158,17 @@ class CloudKitInitialiser {
 
             if let error = error {
                 logger.error("Failed to check for private zone subscription existence: \(String(describing: error))")
+                guard let ckError = error as? CKError else {
+                    self.coordinator?.handleUnexpectedResponse()
+                    return
+                }
 
-                if self.cloudOperationQueue.suspendCloudInterop(dueTo: error) {
-                    self.checkSubscription()
+                if let retryAfter = ckError.retryAfterSeconds {
+                    self.cloudOperationQueue.suspend()
+                    self.checkCustomZone()
+                    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + retryAfter) {
+                        self.checkSubscription()
+                    }
                 } else {
                     logger.error("Irrecoverable error when fetching private zone subscription, assuming it doesn't exist: \(String(describing: error))")
 

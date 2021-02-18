@@ -1,7 +1,6 @@
 import CloudKit
 import CoreData
 import Logging
-import ReadingList_Foundation
 
 extension Book: CKRecordRepresentable {
     static let allCKRecordKeys = CKRecordKey.allCases.map(\.rawValue)
@@ -130,6 +129,8 @@ extension Book: CKRecordRepresentable {
             coverImage = FileManager.default.contents(atPath: assetUrl.path)
         }
     }
+
+    func setRelationshipResolvingInfo(_ record: CKRecord) { }
 
     static func withRemoteIdentifier(_ id: String) -> NSPredicate {
         return NSPredicate(format: "%K == %@", #keyPath(Book.remoteIdentifier), id)

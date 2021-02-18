@@ -1,7 +1,6 @@
 import CloudKit
 import CoreData
 import Logging
-import ReadingList_Foundation
 
 extension ListItem: CKRecordRepresentable {
     static let ckRecordType = "ListItem"
@@ -33,10 +32,10 @@ extension ListItem: CKRecordRepresentable {
         switch ckRecordKey {
         case .sort: return sort
         case .book:
-            guard let bookIdentifier = book.remoteIdentifier else { return nil }
+            guard let bookIdentifier = book?.remoteIdentifier else { return nil }
             return CKRecord.Reference(recordID: CKRecord.ID(recordName: bookIdentifier, zoneID: SyncConstants.zoneID), action: .deleteSelf)
         case .list:
-            guard let listIdentifier = list.remoteIdentifier else { return nil }
+            guard let listIdentifier = list?.remoteIdentifier else { return nil }
             return CKRecord.Reference(recordID: CKRecord.ID(recordName: listIdentifier, zoneID: SyncConstants.zoneID), action: .deleteSelf)
         }
     }
@@ -80,6 +79,15 @@ extension ListItem: CKRecordRepresentable {
 
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return ListItemCKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
+    }
+
+    func setRelationshipResolvingInfo(_ record: CKRecord) {
+        if let bookReference = record[ListItemCKRecordKey.book] as? CKRecord.Reference {
+            bookRemoteIdentifier = bookReference.recordID.recordName
+        }
+        if let listReference = record[ListItemCKRecordKey.list] as? CKRecord.Reference {
+            listRemoteIdentifier = listReference.recordID.recordName
+        }
     }
 }
 

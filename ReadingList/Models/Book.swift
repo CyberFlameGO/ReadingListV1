@@ -36,7 +36,7 @@ class Book: NSManagedObject {
 
     @NSManaged private(set) var listItems: Set<ListItem>
     var lists: [List] {
-        listItems.map { $0.list }
+        listItems.compactMap { $0.list }
     }
 
     override func awakeFromInsert() {
