@@ -25,6 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         launchManager.initialise()
 
+        logger.info("\n\n")
         logger.info("Application launched")
         upgradeManager.performNecessaryUpgradeActions()
 

@@ -133,7 +133,9 @@ class DownstreamSyncProcessor {
         }
 
         logger.error("Handling CKError with code \(ckError.code.name)")
-        if ckError.code == .changeTokenExpired {
+        if ckError.code == .operationCancelled {
+            return
+        } else if ckError.code == .changeTokenExpired {
             logger.warning("Change token expired, resetting token and trying again")
             self.remoteChangeToken = nil
             self.enqueueFetchRemoteChanges()
