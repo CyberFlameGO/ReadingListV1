@@ -16,7 +16,7 @@ extension List: CKRecordRepresentable {
         return NSPredicate(format: "%K = %@", #keyPath(List.name), listName)
     }
 
-    func getValue(for ckRecordKey: String) -> CKRecordValueProtocol? { //swiftlint:disable:this cyclomatic_complexity
+    func getValue(for ckRecordKey: String) -> CKRecordValueProtocol? {
         guard let key = ListCKRecordKey(rawValue: ckRecordKey) else { return nil }
         switch key {
         case .name: return name as NSString
@@ -80,7 +80,7 @@ enum ListCKRecordKey: String, CaseIterable { //swiftlint:disable redundant_strin
     case sort = "sort"
     case order = "order" //swiftlint:enable redundant_string_enum_value
 
-    static func from(coreDataKey: String) -> ListCKRecordKey? { //swiftlint:disable:this cyclomatic_complexity
+    static func from(coreDataKey: String) -> ListCKRecordKey? {
         switch coreDataKey {
         case #keyPath(List.name): return .name
         case #keyPath(List.sort): return .sort

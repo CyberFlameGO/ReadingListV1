@@ -18,7 +18,7 @@ class UpstreamSyncProcessor {
     }
 
     @Persisted("SyncEngine_LocalChangeTimestamp")
-    private(set) var latestConfirmedUploadedTransactionTimestamp: Date?
+    private(set) var latestConfirmedUploadedTransaction: Date?
 
     private var bufferBookmark: Date?
     private lazy var historyFetcher = PersistentHistoryFetcher(context: syncContext, excludeHistoryFromContextWithName: syncContext.name!)
@@ -28,7 +28,7 @@ class UpstreamSyncProcessor {
         NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: storeCoordinator)
             .sink(receiveValue: handleLocalChangeNotification)
             .store(in: &cancellables)
-        self.bufferBookmark = latestConfirmedUploadedTransactionTimestamp
+        self.bufferBookmark = latestConfirmedUploadedTransaction
         self.enqueueUploadOperations()
     }
 
@@ -68,7 +68,7 @@ class UpstreamSyncProcessor {
         let updateBufferBookmarkOperation = BlockOperation {
             let transaction = self.localTransactionsPendingPushCompletion.removeFirst()
             logger.info("Updating confirmed pushed timestamp to \(transaction.timestamp)")
-            self.latestConfirmedUploadedTransactionTimestamp = transaction.timestamp
+            self.latestConfirmedUploadedTransaction = transaction.timestamp
             self.historyFetcher.deleteHistory(beforeToken: transaction.token)
             self.enqueueUploadOperations()
         }
@@ -92,7 +92,7 @@ class UpstreamSyncProcessor {
                     self.localTransactionsPendingPushCompletion.removeFirst()
                     uploadOperation.cancel()
                     updateBufferBookmarkOperation.cancel()
-                    self.latestConfirmedUploadedTransactionTimestamp = transaction.timestamp
+                    self.latestConfirmedUploadedTransaction = transaction.timestamp
                     self.enqueueUploadOperations()
                 }
             }
@@ -117,7 +117,7 @@ class UpstreamSyncProcessor {
         let updateBookmarkOperation = BlockOperation {
             guard let timestamp = timestamp else { fatalError("Unexpected nil timestamp") }
             logger.info("Updating upload bookmark to \(timestamp)")
-            self.latestConfirmedUploadedTransactionTimestamp = timestamp
+            self.latestConfirmedUploadedTransaction = timestamp
             self.bufferBookmark = timestamp
 
             // In case there have been any local changes since we started uploading all records:
@@ -157,7 +157,7 @@ class UpstreamSyncProcessor {
                     guard let managedObject = self.syncContext.object(with: change.changedObjectID) as? CKRecordRepresentable else { return nil }
                     return (change, managedObject)
                 }
-            let changesByEntityType = Dictionary(grouping: changesAndObjects, by: { $0.managedObject.entity })
+            let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
 
             uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity()] }
                 .flatMap { $0 }

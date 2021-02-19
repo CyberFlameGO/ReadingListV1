@@ -95,11 +95,11 @@ class LaunchManager {
                     DispatchQueue.main.async {
                         self.initialiseAfterPersistentStoreLoad()
                         onSuccess()
-                    }
 
-                    // Notify any other parts of the app which may be waiting on an initialised persistent container (specifically,
-                    // background backup tasks).
-                    NotificationCenter.default.post(name: .didCompletePersistentStoreInitialisation, object: nil)
+                        // Notify any other parts of the app which may be waiting on an initialised persistent container (specifically,
+                        // background backup tasks).
+                        NotificationCenter.default.post(name: .didCompletePersistentStoreInitialisation, object: nil)
+                    }
                 }
             } catch MigrationError.incompatibleStore {
                 DispatchQueue.main.async {

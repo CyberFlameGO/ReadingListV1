@@ -1,6 +1,6 @@
 import UIKit
-import Reachability
 import Logging
+import Combine
 
 let logger = Logger(label: "com.andrewbennet.books")
 
@@ -45,12 +45,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private func initialiseSyncCoordinator() {
         // Initialise the Sync Coordinator which will maintain iCloud synchronisation
-        self.syncCoordinator = SyncCoordinator(
+        let syncCoordinator = SyncCoordinator(
             persistentStoreCoordinator: PersistentStoreManager.container.persistentStoreCoordinator,
             orderedTypesToSync: [Book.self, List.self, ListItem.self]
         )
+        self.syncCoordinator = syncCoordinator
         if GeneralSettings.iCloudSyncEnabled {
-            syncCoordinator?.start()
+            syncCoordinator.start()
         }
     }
 
@@ -75,11 +76,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         logger.error("Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
+    private var persistentStoreObserver: AnyCancellable?
+
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         logger.info("Application received remote notification")
-        if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = self.syncCoordinator {
-            syncCoordinator.respondToRemoteChangeNotification()
+        guard GeneralSettings.iCloudSyncEnabled else { return }
+        if let syncCoordinator = self.syncCoordinator {
+            syncCoordinator.respondToRemoteChangeNotification(completion: completionHandler)
+        } else {
+            logger.info("Persistent store was not initialised; waiting for initialisation to complete")
+            persistentStoreObserver = NotificationCenter.default.publisher(for: .didCompletePersistentStoreInitialisation, object: nil)
+                .receive(on: DispatchQueue.main)
+                .sink { _ in
+                    logger.info("Persistent store initialisation completion detected; responding to remote change notification")
+                    guard let syncCoordinator = self.syncCoordinator else { fatalError("Unexpected nil syncCoordinator") }
+                    syncCoordinator.respondToRemoteChangeNotification(completion: completionHandler)
+                }
         }
     }
 }

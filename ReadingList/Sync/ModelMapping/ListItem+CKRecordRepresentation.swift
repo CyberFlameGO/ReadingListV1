@@ -27,7 +27,7 @@ extension ListItem: CKRecordRepresentable {
         ])
     }
 
-    func getValue(for key: String) -> CKRecordValueProtocol? { //swiftlint:disable:this cyclomatic_complexity
+    func getValue(for key: String) -> CKRecordValueProtocol? {
         guard let ckRecordKey = ListItemCKRecordKey(rawValue: key) else { return nil }
         switch ckRecordKey {
         case .sort: return sort
@@ -103,7 +103,7 @@ enum ListItemCKRecordKey: String, CaseIterable { //swiftlint:disable redundant_s
     case list = "list"
     case sort = "sort" //swiftlint:enable redundant_string_enum_value
 
-    static func from(coreDataKey: String) -> ListItemCKRecordKey? { //swiftlint:disable:this cyclomatic_complexity
+    static func from(coreDataKey: String) -> ListItemCKRecordKey? {
         switch coreDataKey {
         case #keyPath(ListItem.sort): return .sort
         case #keyPath(ListItem.book): return .book

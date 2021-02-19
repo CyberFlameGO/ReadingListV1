@@ -55,12 +55,12 @@ struct CloudSync: View {
                 footer: FooterText(footerText, inset: hostingSplitView.isSplit
                 )
             ) {
-                Toggle(isOn: settings.$syncEnabled.binding.didSet { on in
+                Toggle(isOn: settings.$syncEnabled.binding.didSet { isEnabled in
                     guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
                         os_log(.error, "SyncCoordinator nil when attempting to enable or disable iCloud sync")
                         return
                     }
-                    if on {
+                    if isEnabled {
                         syncCoordinator.start()
                     } else {
                         syncCoordinator.stop()

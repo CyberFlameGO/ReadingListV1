@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import CoreData
+import UIKit
 import PersistedPropertyWrapper
 
 class DownstreamSyncProcessor {
@@ -24,7 +25,7 @@ class DownstreamSyncProcessor {
         remoteChangeToken = nil
     }
 
-    func enqueueFetchRemoteChanges() {
+    func enqueueFetchRemoteChanges(completion: ((UIBackgroundFetchResult) -> Void)? = nil) {
         let operation = CKFetchRecordZoneChangesOperation()
         let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration(
             previousServerChangeToken: remoteChangeToken,
@@ -46,10 +47,14 @@ class DownstreamSyncProcessor {
             logger.trace("recordWithIDWasDeletedBlock for CKRecord.ID \(recordID.recordName)")
             deletionIDs.append(recordID, to: recordType)
         }
+        var anyChanges = false
 
         func processChanges(newToken: CKServerChangeToken?) {
             importChanges(updatesByType: recordsByType, deletionsByType: deletionIDs)
-
+            if !recordsByType.isEmpty || !deletionIDs.isEmpty {
+                anyChanges = true
+            }
+            
             logger.info("Saving syncContext after record change import")
             self.syncContext.saveIfChanged()
             if let newToken = newToken {
@@ -86,10 +91,19 @@ class DownstreamSyncProcessor {
             self.syncContext.performAndWait {
                 if let error = error {
                     logger.error("Remote change fetch completed with error")
-                    self.handleDownloadError(error)
+                    if let completion = completion {
+                        logger.info("Calling UIBackgroundFetch completion handler with failure")
+                        completion(.failed)
+                    } else {
+                        self.handleDownloadError(error)
+                    }
                 } else {
                     logger.info("Remote change fetch completed successfully. Resolving any references")
                     CKReferenceResolver(context: self.syncContext).resolveReferences()
+                    if let completion = completion {
+                        logger.info("Calling UIBackgroundFetch completion handler with \(anyChanges ? "newData" : "noData")")
+                        completion(anyChanges ? .newData : .noData)
+                    }
                 }
             }
         }

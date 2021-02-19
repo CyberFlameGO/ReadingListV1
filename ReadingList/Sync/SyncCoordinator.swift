@@ -3,6 +3,7 @@ import CloudKit
 import CoreData
 import Logging
 import Combine
+import UIKit
 import Reachability
 
 @available(iOS 13.0, *)
@@ -118,8 +119,8 @@ final class SyncCoordinator {
         syncHelper.eraseSyncMetadata()
     }
 
-    func respondToRemoteChangeNotification() {
-        self.downstreamProcessor.enqueueFetchRemoteChanges()
+    func respondToRemoteChangeNotification(completion: ((UIBackgroundFetchResult) -> Void)? = nil) {
+        self.downstreamProcessor.enqueueFetchRemoteChanges(completion: completion)
     }
 
     func requestFetch(for recordIDs: [CKRecord.ID]) {
@@ -144,7 +145,7 @@ final class SyncCoordinator {
         return SyncStatus(
             objectCountByEntityName: totalCounts,
             uploadedObjectCount: uploadedCounts,
-            lastProcessedLocalTransaction: upstreamProcessor.latestConfirmedUploadedTransactionTimestamp
+            lastProcessedLocalTransaction: upstreamProcessor.latestConfirmedUploadedTransaction
         )
     }
 
