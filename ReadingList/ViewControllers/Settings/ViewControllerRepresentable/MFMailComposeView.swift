@@ -7,6 +7,13 @@ struct MailView: UIViewControllerRepresentable {
     let receipients: [String]?
     let messageBody: String?
     let subject: String?
+    let attachments: [Attachment]?
+    
+    struct Attachment {
+        let data: Data
+        let mimeType: String
+        let fileName: String
+    }
 
     class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
         @Binding var isShowing: Bool
@@ -27,15 +34,21 @@ struct MailView: UIViewControllerRepresentable {
     func makeUIViewController(context: UIViewControllerRepresentableContext<MailView>) -> MFMailComposeViewController {
         let viewController = MFMailComposeViewController()
         viewController.mailComposeDelegate = context.coordinator
-        if let messageBody = messageBody {
-            viewController.setMessageBody(messageBody, isHTML: false)
-        }
-        if let subject = subject {
-            viewController.setSubject(subject)
-        }
-        viewController.setToRecipients(receipients)
         return viewController
     }
 
-    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: UIViewControllerRepresentableContext<MailView>) { }
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: UIViewControllerRepresentableContext<MailView>) {
+        if let messageBody = messageBody {
+            uiViewController.setMessageBody(messageBody, isHTML: false)
+        }
+        if let subject = subject {
+            uiViewController.setSubject(subject)
+        }
+        if let attachments = attachments {
+            for attachment in attachments {
+                uiViewController.addAttachmentData(attachment.data, mimeType: attachment.mimeType, fileName: attachment.fileName)
+            }
+        }
+        uiViewController.setToRecipients(receipients)
+    }
 }

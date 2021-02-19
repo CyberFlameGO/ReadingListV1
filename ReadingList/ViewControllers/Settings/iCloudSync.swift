@@ -36,7 +36,9 @@ struct CloudSync: View {
 
     func updateAccountStatus() {
         CKContainer.default().accountStatus { status, _ in
-            accountStatus = status
+            DispatchQueue.main.async {
+                accountStatus = status
+            }
         }
     }
 
