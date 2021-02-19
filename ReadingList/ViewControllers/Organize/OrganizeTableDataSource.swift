@@ -52,9 +52,10 @@ final class OrganizeTableViewDataSource: EmptyDetectingTableDiffableDataSource<S
             resultsController.object(at: $0)
         }
 
-        super.init(tableView: tableView) { _, indexPath, _ in
+        super.init(tableView: tableView) { _, indexPath, itemID in
             let cell = tableView.dequeueReusableCell(withIdentifier: "ListCell", for: indexPath)
-            cell.configure(from: resultsController.object(at: indexPath))
+            let list = PersistentStoreManager.container.viewContext.object(with: itemID) as! List
+            cell.configure(from: list)
             return cell
         }
         changeMediator = ResultsControllerSnapshotGenerator { [unowned self] in
