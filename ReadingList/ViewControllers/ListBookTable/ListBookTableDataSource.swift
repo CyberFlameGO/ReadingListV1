@@ -87,10 +87,10 @@ final class ListBookDiffableDataSource: EmptyDetectingTableDiffableDataSource<St
         self.sortManager = SortManager<ListItem>(tableView) {
             wrappedController.wrappedValue.object(at: $0)
         }
-        super.init(tableView: tableView) { _, indexPath, _ in
+        super.init(tableView: tableView) { _, indexPath, itemID in
             let cell = tableView.dequeue(BookTableViewCell.self, for: indexPath)
-            let book = wrappedController.wrappedValue.object(at: indexPath).book
-            cell.configureFrom(book, includeReadDates: false)
+            let listItem = PersistentStoreManager.container.viewContext.object(with: itemID) as! ListItem
+            cell.configureFrom(listItem.book, includeReadDates: false)
             return cell
         }
 
