@@ -14,6 +14,7 @@ extension Book: CKRecordRepresentable {
         } else if let manualBookId = manualBookId {
             return "mid:\(manualBookId)"
         } else {
+            logger.critical("Book \(objectID.uriRepresentation().path) has neither Google Books ID nor Manual Book ID")
             fatalError("No google book or manual book ID")
         }
     }

@@ -22,6 +22,7 @@ final class SyncCoordinator {
 
         downstreamProcessor.coordinator = self
         upstreamProcessor.coordinator = self
+        cloudKitInitialiser.coordinator = self
     }
 
     private let syncContext: NSManagedObjectContext
@@ -62,8 +63,8 @@ final class SyncCoordinator {
             NotificationCenter.default.publisher(for: .CKAccountChanged)
                 .sink { [weak self] _ in
                     guard let self = self else { return }
-                    logger.info("CKAccountChanged; stopping SyncCoordinator")
-                    self.stop()
+                    logger.info("CKAccountChanged; stopping SyncCoordinator and disabling iCloud Sync")
+                    self.disableSync()
                 }.store(in: &self.cancellables)
 
             // Monitoring the network reachabiity will allow us to automatically re-do work when network connectivity resumes
@@ -102,8 +103,7 @@ final class SyncCoordinator {
         cloudOperationQueue.cancelAll()
         cloudOperationQueue.addBlock {
             self.syncContext.perform {
-                let syncHelper = SyncResetter(managedObjectContext: self.syncContext, entityTypes: self.typesToSync.map { $0.entity() })
-                syncHelper.eraseSyncMetadata()
+                self.eraseSyncMetadata()
 
                 self.downstreamProcessor.resetChangeTracking()
                 self.downstreamProcessor.enqueueFetchRemoteChanges()
@@ -111,6 +111,11 @@ final class SyncCoordinator {
                 self.upstreamProcessor.enqueueUploadOperations()
             }
         }
+    }
+    
+    func eraseSyncMetadata() {
+        let syncHelper = SyncResetter(managedObjectContext: self.syncContext, entityTypes: self.typesToSync.map { $0.entity() })
+        syncHelper.eraseSyncMetadata()
     }
 
     func respondToRemoteChangeNotification() {
