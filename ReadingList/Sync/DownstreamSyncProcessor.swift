@@ -94,9 +94,8 @@ class DownstreamSyncProcessor {
                     if let completion = completion {
                         logger.info("Calling UIBackgroundFetch completion handler with failure")
                         completion(.failed)
-                    } else {
-                        self.handleDownloadError(error)
                     }
+                    self.handleDownloadError(error)
                 } else {
                     logger.info("Remote change fetch completed successfully. Resolving any references")
                     CKReferenceResolver(context: self.syncContext).resolveReferences()
