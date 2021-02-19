@@ -19,7 +19,7 @@ extension UITableViewCell {
 final class Organize: UITableViewController {
 
     var searchController: UISearchController!
-    var dataSource: OrganizeTableViewDataSourceCommon!
+    var dataSource: OrganizeTableViewDataSource!
     var emptyDataSetManager: OrganizeEmptyDataSetManager!
 
     override func viewDidLoad() {
@@ -33,7 +33,10 @@ final class Organize: UITableViewController {
         searchController.delegate = self
         navigationItem.searchController = searchController
 
-        dataSource = OrganizeTableViewDataSource(tableView: tableView, resultsController: buildResultsController())
+        let sortManager = SortManager<List>(tableView) { [unowned self] in
+            self.dataSource.getItem(at: $0)
+        }
+        dataSource = OrganizeTableViewDataSource(tableView: tableView, resultsController: buildResultsController(), sortManager: sortManager)
         emptyDataSetManager = OrganizeEmptyDataSetManager(tableView: tableView, navigationBar: navigationController?.navigationBar, navigationItem: navigationItem, searchController: searchController) { [weak self] _ in
             self?.configureNavigationBarButtons()
         }

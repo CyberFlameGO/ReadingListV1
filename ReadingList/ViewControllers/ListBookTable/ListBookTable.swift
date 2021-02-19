@@ -45,7 +45,10 @@ final class ListBookTable: UITableViewController {
         searchController.delegate = self
         navigationItem.searchController = searchController
 
-        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), searchController: searchController, onContentChanged: reloadHeaders)
+        let sortManager = SortManager<ListItem>(tableView) { [unowned self] in
+            self.dataSource.getItem(at: $0)
+        }
+        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), sortManager: sortManager, searchController: searchController, onContentChanged: reloadHeaders)
 
         // Configure the empty state manager to detect when the table becomes empty
         emptyStateManager = ListBookTableEmptyDataSetManager(tableView: tableView, navigationBar: navigationController?.navigationBar, navigationItem: navigationItem, searchController: searchController, list: list)
