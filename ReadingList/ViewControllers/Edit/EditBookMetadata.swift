@@ -241,6 +241,10 @@ final class EditBookMetadata: FormViewController {
                     self.book.googleBooksId = cell.value
                 }
             }
+            <<< LabelRow {
+                $0.title = "CloudKit Change Tag"
+                $0.value = book.buildCKRecord().recordChangeTag
+            }
         #endif
 
         // Validate on start

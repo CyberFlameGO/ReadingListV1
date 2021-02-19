@@ -32,7 +32,7 @@ class CloudKitInitialiser {
             completion()
         }
     }
-    
+
     private func handleCloudPreparationError(_ error: Error, rerunOperation: () -> Void) -> Bool {
         guard let ckError = error as? CKError else {
             self.coordinator?.handleUnexpectedResponse()

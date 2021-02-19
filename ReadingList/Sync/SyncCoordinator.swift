@@ -112,7 +112,7 @@ final class SyncCoordinator {
             }
         }
     }
-    
+
     func eraseSyncMetadata() {
         let syncHelper = SyncResetter(managedObjectContext: self.syncContext, entityTypes: self.typesToSync.map { $0.entity() })
         syncHelper.eraseSyncMetadata()
