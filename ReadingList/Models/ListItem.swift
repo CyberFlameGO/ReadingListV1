@@ -12,11 +12,6 @@ class ListItem: NSManagedObject {
     @NSManaged private(set) var book: Book?
     @NSManaged private(set) var list: List?
 
-    // These two properties are used to resolve relationships if, while syncing, a list item arrives before the associated
-    // book or list.
-    @NSManaged var bookRemoteIdentifier: String?
-    @NSManaged var listRemoteIdentifier: String?
-
     convenience init(context: NSManagedObjectContext, book: Book, list: List, sort: Int32) {
         self.init(context: context)
         self.book = book

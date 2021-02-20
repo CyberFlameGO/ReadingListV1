@@ -57,6 +57,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         launchManager.handleApplicationDidBecomeActive()
+        
+        if let syncCoordinator = self.syncCoordinator, GeneralSettings.iCloudSyncEnabled {
+            syncCoordinator.enqueueFetchRemoteChanges()
+        }
     }
 
     func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
@@ -83,7 +87,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         logger.info("Application received remote notification")
         guard GeneralSettings.iCloudSyncEnabled else { return }
         if let syncCoordinator = self.syncCoordinator {
-            syncCoordinator.respondToRemoteChangeNotification(completion: completionHandler)
+            syncCoordinator.enqueueFetchRemoteChanges(completion: completionHandler)
         } else {
             logger.info("Persistent store was not initialised; waiting for initialisation to complete")
             persistentStoreObserver = NotificationCenter.default.publisher(for: .didCompletePersistentStoreInitialisation, object: nil)
@@ -91,7 +95,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 .sink { _ in
                     logger.info("Persistent store initialisation completion detected; responding to remote change notification")
                     guard let syncCoordinator = self.syncCoordinator else { fatalError("Unexpected nil syncCoordinator") }
-                    syncCoordinator.respondToRemoteChangeNotification(completion: completionHandler)
+                    syncCoordinator.enqueueFetchRemoteChanges(completion: completionHandler)
                 }
         }
     }

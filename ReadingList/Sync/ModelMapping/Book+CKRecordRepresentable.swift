@@ -131,8 +131,6 @@ extension Book: CKRecordRepresentable {
         }
     }
 
-    func setRelationshipResolvingInfo(_ record: CKRecord) { }
-
     static func withRemoteIdentifier(_ id: String) -> NSPredicate {
         return NSPredicate(format: "%K == %@", #keyPath(Book.remoteIdentifier), id)
     }

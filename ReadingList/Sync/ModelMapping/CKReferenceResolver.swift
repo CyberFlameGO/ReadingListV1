@@ -19,37 +19,37 @@ struct CKReferenceResolver {
         let results = try! context.fetch(fetchRequest) as! [ListItem]
         logger.info("\(results.count) unresolved ListItems to fix")
         for result in results {
+            guard let remoteIdentifier = result.remoteIdentifier else {
+                logger.error("ListItem was missing bookRemoteIdentifier; deleting")
+                result.delete()
+                continue
+            }
+            guard let recordName = ListItemRecordName(listItemRecordName: remoteIdentifier) else {
+                logger.critical("Could not parse ListItem remote identifier \(remoteIdentifier)")
+                result.delete()
+                continue
+            }
             if result.book == nil {
-                if let bookRemoteIdentifier = result.bookRemoteIdentifier {
-                    let bookFetchRequest = Book.fetchRequest()
-                    bookFetchRequest.predicate = Book.withRemoteIdentifier(bookRemoteIdentifier)
-                    bookFetchRequest.fetchLimit = 1
-                    if let matchingBook = try! context.fetch(bookFetchRequest).first {
-                        logger.info("Resolved book \(bookRemoteIdentifier) on list item \(result.remoteIdentifier)")
-                        result.setValue(matchingBook, forKeyPath: #keyPath(ListItem.book))
-                    } else {
-                        logger.warning("Could not find book with remoteIdentifier \(bookRemoteIdentifier)")
-                    }
+                let bookFetchRequest = Book.fetchRequest()
+                bookFetchRequest.predicate = Book.withRemoteIdentifier(recordName.bookRemoteIdentifier)
+                bookFetchRequest.fetchLimit = 1
+                if let matchingBook = try! context.fetch(bookFetchRequest).first {
+                    logger.info("Resolved book \(recordName.bookRemoteIdentifier) on list item \(remoteIdentifier)")
+                    result.setValue(matchingBook, forKeyPath: #keyPath(ListItem.book))
                 } else {
-                    logger.error("ListItem was missing bookRemoteIdentifier; deleting")
-                    result.delete()
+                    logger.warning("Could not find book with remoteIdentifier \(recordName.bookRemoteIdentifier)")
                 }
             }
 
             if result.list == nil {
-                if let listRemoteIdentifier = result.listRemoteIdentifier {
-                    let listFetchRequest = List.fetchRequest()
-                    listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(List.remoteIdentifier), listRemoteIdentifier)
-                    listFetchRequest.fetchLimit = 1
-                    if let matchingList = try! context.fetch(listFetchRequest).first {
-                        logger.info("Resolved list \(listRemoteIdentifier) on list item \(result.remoteIdentifier)")
-                        result.setValue(matchingList, forKeyPath: #keyPath(ListItem.list))
-                    } else {
-                        logger.warning("Could not find list with remoteIdentifier \(listRemoteIdentifier)")
-                    }
+                let listFetchRequest = List.fetchRequest()
+                listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(List.remoteIdentifier), recordName.listRemoteIdentifier)
+                listFetchRequest.fetchLimit = 1
+                if let matchingList = try! context.fetch(listFetchRequest).first {
+                    logger.info("Resolved list \(recordName.listRemoteIdentifier) on list item \(remoteIdentifier)")
+                    result.setValue(matchingList, forKeyPath: #keyPath(ListItem.list))
                 } else {
-                    logger.error("ListItem was missing listRemoteIdentifier; deleting")
-                    result.delete()
+                    logger.warning("Could not find list with remoteIdentifier \(recordName.listRemoteIdentifier)")
                 }
             }
 

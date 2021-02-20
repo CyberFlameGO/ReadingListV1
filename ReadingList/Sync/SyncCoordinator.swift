@@ -119,7 +119,7 @@ final class SyncCoordinator {
         syncHelper.eraseSyncMetadata()
     }
 
-    func respondToRemoteChangeNotification(completion: ((UIBackgroundFetchResult) -> Void)? = nil) {
+    func enqueueFetchRemoteChanges(completion: ((UIBackgroundFetchResult) -> Void)? = nil) {
         self.downstreamProcessor.enqueueFetchRemoteChanges(completion: completion)
     }
 

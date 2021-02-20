@@ -109,7 +109,7 @@ public struct DebugSettings: View {
                         Button("Simulate remote change notification") {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                                 if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = AppDelegate.shared.syncCoordinator as? SyncCoordinator/*, syncCoordinator.remote.isInitialised */{
-                                    syncCoordinator.respondToRemoteChangeNotification()
+                                    syncCoordinator.enqueueFetchRemoteChanges()
                                 }
                             }
                         }.disabled(

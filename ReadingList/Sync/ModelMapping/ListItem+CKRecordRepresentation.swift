@@ -69,7 +69,17 @@ extension ListItem: CKRecordRepresentable {
     }
 
     func newRecordName() -> String {
-        UUID().uuidString
+        guard let book = book, let bookRemoteIdentifier = book.remoteIdentifier else {
+            logger.critical("Missing book remote identifier while generating ListItem name; using UUID")
+            return UUID().uuidString
+        }
+        guard let list = list, let listRemoteIdentifier = list.remoteIdentifier else {
+            logger.critical("Missing list remote identifier while generating ListItem name; using UUID")
+            return UUID().uuidString
+        }
+        // Using a remoteIdentifier which is unique for a book/list combination means that we won't be able to
+        // insert duplicate book entries into a list.
+        return ListItemRecordName(bookRemoteIdentifier: bookRemoteIdentifier, listRemoteIdentifier: listRemoteIdentifier).fullRecordName
     }
 
     func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String] {
@@ -80,14 +90,26 @@ extension ListItem: CKRecordRepresentable {
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return ListItemCKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }
+}
 
-    func setRelationshipResolvingInfo(_ record: CKRecord) {
-        if let bookReference = record[ListItemCKRecordKey.book] as? CKRecord.Reference {
-            bookRemoteIdentifier = bookReference.recordID.recordName
-        }
-        if let listReference = record[ListItemCKRecordKey.list] as? CKRecord.Reference {
-            listRemoteIdentifier = listReference.recordID.recordName
-        }
+struct ListItemRecordName {
+    let fullRecordName: String
+    let bookRemoteIdentifier: String
+    let listRemoteIdentifier: String
+    private let separator = "__"
+    
+    init(bookRemoteIdentifier: String, listRemoteIdentifier: String) {
+        self.bookRemoteIdentifier = bookRemoteIdentifier
+        self.listRemoteIdentifier = listRemoteIdentifier
+        self.fullRecordName = "\(bookRemoteIdentifier)\(separator)\(listRemoteIdentifier)"
+    }
+    
+    init?(listItemRecordName: String) {
+        let splitComponents = listItemRecordName.components(separatedBy: separator)
+        if splitComponents.count != 2 { return nil }
+        self.fullRecordName = listItemRecordName
+        self.bookRemoteIdentifier = splitComponents[0]
+        self.listRemoteIdentifier = splitComponents[1]
     }
 }
 

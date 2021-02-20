@@ -56,8 +56,6 @@ extension List: CKRecordRepresentable {
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return ListCKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }
-
-    func setRelationshipResolvingInfo(_ record: CKRecord) { }
 }
 
 extension CKRecord {
