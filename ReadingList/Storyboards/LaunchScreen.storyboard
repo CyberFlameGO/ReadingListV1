@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="wx6-4z-trQ">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="dlF-Vi-aub">
     <device id="ipad9_7" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
         <deployment identifier="iOS"/>
@@ -8,43 +8,114 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--View Controller-->
-        <scene sceneID="8a3-2c-soi">
+        <!--Finished-->
+        <scene sceneID="1da-Kr-DH2">
             <objects>
-                <viewController id="wx6-4z-trQ" sceneMemberID="viewController">
+                <viewController id="Lpd-6w-Xg6" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Finished" image="to-do" id="yrW-wx-cGy"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="cYb-5O-3qM" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-10891" y="949"/>
+        </scene>
+        <!--Organize-->
+        <scene sceneID="K4n-lt-LNc">
+            <objects>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="EJR-DU-s2e" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                <viewController id="Gxm-4I-am0" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Organize" image="organise" id="B9y-fD-0us"/>
+                </viewController>
+            </objects>
+            <point key="canvasLocation" x="-10166" y="431"/>
+        </scene>
+        <!--Settings-->
+        <scene sceneID="UXu-ff-0oh">
+            <objects>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="35p-GS-DbW" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                <viewController id="a17-PQ-IVk" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Settings" image="settings" id="PIC-J1-h4T"/>
+                </viewController>
+            </objects>
+            <point key="canvasLocation" x="-9475" y="423"/>
+        </scene>
+        <!--To Read-->
+        <scene sceneID="9vK-Ms-P8X">
+            <objects>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="WeQ-dW-B2M" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                <navigationController title="To Read" id="PCr-4k-eBg" sceneMemberID="viewController">
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" id="wRv-OQ-MP3">
+                        <rect key="frame" x="0.0" y="0.0" width="768" height="50"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                    </navigationBar>
+                    <connections>
+                        <segue destination="nrq-O1-H7s" kind="relationship" relationship="rootViewController" id="tjp-jt-a5M"/>
+                    </connections>
+                </navigationController>
+            </objects>
+            <point key="canvasLocation" x="-10058" y="-821"/>
+        </scene>
+        <!--To Read-->
+        <scene sceneID="I7Y-4l-lVw">
+            <objects>
+                <viewController id="nrq-O1-H7s" sceneMemberID="viewController">
                     <layoutGuides>
-                        <viewControllerLayoutGuide type="top" id="JcU-NS-jjA"/>
-                        <viewControllerLayoutGuide type="bottom" id="Sly-0k-4eQ"/>
+                        <viewControllerLayoutGuide type="top" id="ghM-SM-lGl"/>
+                        <viewControllerLayoutGuide type="bottom" id="0rH-ll-H6k"/>
                     </layoutGuides>
-                    <view key="view" contentMode="scaleToFill" id="Bgo-Cu-cYT">
+                    <view key="view" contentMode="scaleToFill" id="18a-Vt-BIN">
                         <rect key="frame" x="0.0" y="0.0" width="768" height="1024"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="AppIcon_200_Rounded" translatesAutoresizingMaskIntoConstraints="NO" id="tIb-Gu-5Wk">
-                                <rect key="frame" x="284" y="412" width="200" height="200"/>
-                                <constraints>
-                                    <constraint firstAttribute="width" secondItem="tIb-Gu-5Wk" secondAttribute="height" multiplier="1:1" id="XUi-8F-wDU"/>
-                                    <constraint firstAttribute="width" relation="lessThanOrEqual" constant="200" id="ozH-Hu-j04"/>
-                                </constraints>
-                            </imageView>
-                        </subviews>
-                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
-                        <constraints>
-                            <constraint firstItem="tIb-Gu-5Wk" firstAttribute="centerX" secondItem="Bgo-Cu-cYT" secondAttribute="centerX" id="3Ym-Bc-0LS"/>
-                            <constraint firstItem="tIb-Gu-5Wk" firstAttribute="centerY" secondItem="Bgo-Cu-cYT" secondAttribute="centerY" id="YNC-fs-LG2"/>
-                            <constraint firstItem="tIb-Gu-5Wk" firstAttribute="width" secondItem="Bgo-Cu-cYT" secondAttribute="width" multiplier="0.4" priority="999" id="dBi-Hg-bTI"/>
-                        </constraints>
+                        <color key="backgroundColor" systemColor="secondarySystemBackgroundColor"/>
                     </view>
+                    <navigationItem key="navigationItem" title="To Read" id="cGd-Hd-AxQ">
+                        <barButtonItem key="rightBarButtonItem" enabled="NO" systemItem="add" id="Iw4-e7-mYx"/>
+                    </navigationItem>
                 </viewController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="obR-Kv-2PM" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="YXY-vK-fBk" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-10516" y="410.64467766116945"/>
+            <point key="canvasLocation" x="-9319" y="-794"/>
+        </scene>
+        <!--To Read-->
+        <scene sceneID="ovR-wR-Cra">
+            <objects>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="SrW-4n-Mme" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                <splitViewController allowDoubleColumnStyle="YES" id="Tbt-P5-nQV" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="To Read" image="courses-filled" id="11w-Th-KIL"/>
+                    <connections>
+                        <segue destination="PCr-4k-eBg" kind="relationship" relationship="masterViewController" id="UZj-Zd-Rkv"/>
+                    </connections>
+                </splitViewController>
+            </objects>
+            <point key="canvasLocation" x="-10813" y="-518"/>
+        </scene>
+        <!--Tab Bar Controller-->
+        <scene sceneID="NpF-4e-xhO">
+            <objects>
+                <tabBarController id="dlF-Vi-aub" sceneMemberID="viewController">
+                    <tabBar key="tabBar" userInteractionEnabled="NO" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="jBR-2q-vIf">
+                        <rect key="frame" x="0.0" y="0.0" width="414" height="49"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                        <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                    </tabBar>
+                    <connections>
+                        <segue destination="Tbt-P5-nQV" kind="relationship" relationship="viewControllers" id="hkl-pa-igk"/>
+                        <segue destination="Lpd-6w-Xg6" kind="relationship" relationship="viewControllers" id="JGI-Y8-9NT"/>
+                        <segue destination="Gxm-4I-am0" kind="relationship" relationship="viewControllers" id="Bmy-AY-sOY"/>
+                        <segue destination="a17-PQ-IVk" kind="relationship" relationship="viewControllers" id="7bU-cY-Qen"/>
+                    </connections>
+                </tabBarController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="SnB-o7-smk" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-11852" y="44"/>
         </scene>
     </scenes>
     <resources>
-        <image name="AppIcon_200_Rounded" width="200" height="200"/>
-        <systemColor name="systemBackgroundColor">
-            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        <image name="courses-filled" width="25" height="25"/>
+        <image name="organise" width="25" height="25"/>
+        <image name="settings" width="25" height="25"/>
+        <image name="to-do" width="25" height="25"/>
+        <systemColor name="secondarySystemBackgroundColor">
+            <color red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
     </resources>
 </document>
