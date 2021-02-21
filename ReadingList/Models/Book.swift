@@ -225,13 +225,22 @@ class Book: NSManagedObject {
             os_log("Orphaned subject %{public}s deleted.", type: .info, subject.name)
         }
     }
-    
-    func setRemoteIdentifier() {
+
+    @discardableResult
+    func trySetRemoteIdentifier() -> Bool {
         if let googleBooksId = googleBooksId {
             remoteIdentifier = "gbid:\(googleBooksId)"
+            return true
         } else if let manualBookId = manualBookId {
             remoteIdentifier = "mid:\(manualBookId)"
+            return true
         } else {
+            return false
+        }
+    }
+
+    func setRemoteIdentifier() {
+        if !trySetRemoteIdentifier() {
             logger.critical("Book \(objectID.uriRepresentation().path) has neither Google Books ID nor Manual Book ID")
             fatalError("No google book or manual book ID")
         }

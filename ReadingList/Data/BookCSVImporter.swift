@@ -125,6 +125,7 @@ class BookCSVParserDelegate: CSVParserDelegate {
                 book.sort = sortManager.getAndIncrementSort()
             }
             book.populate(fromCsvRow: csvRow)
+            book.trySetRemoteIdentifier()
             book.subjects.formUnion(createSubjects(csvRow.subjects))
             attach(csvRow.lists, to: book)
 
