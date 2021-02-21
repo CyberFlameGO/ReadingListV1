@@ -190,7 +190,7 @@ final class ListBookTable: UITableViewController {
         if let updatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
             let updatedBooks = updatedObjects.compactMap { $0 as? Book }
             if !updatedBooks.isEmpty {
-                var snapshot = self.dataSource.controller.snapshot()
+                var snapshot = self.dataSource.snapshot()
                 for updatedBook in updatedBooks {
                     snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
                 }
@@ -218,7 +218,7 @@ final class ListBookTable: UITableViewController {
 
     override func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath) -> [UITableViewRowAction]? {
         return [UITableViewRowAction(style: .destructive, title: "Remove") { _, indexPath in
-            self.dataSource.controller.object(at: indexPath).deleteAndSave()
+            self.dataSource.getItem(at: indexPath).deleteAndSave()
             UserEngagement.logEvent(.removeBookFromList)
         }]
     }
@@ -266,7 +266,7 @@ extension ListBookTable: UISearchResultsUpdating {
 extension ListBookTable: HeaderConfigurable {
     func configureHeader(_ header: UITableViewHeaderFooterView, at index: Int) {
         guard let header = header as? BookTableHeader else { preconditionFailure() }
-        let numberOfRows = dataSource.controller.sections![0].numberOfObjects
+        let numberOfRows = dataSource.snapshot().numberOfItems
         header.configure(list: list, bookCount: numberOfRows, enableSort: !isEditing && !searchController.isActive)
     }
 }
