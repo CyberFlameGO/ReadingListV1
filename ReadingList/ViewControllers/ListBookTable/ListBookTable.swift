@@ -5,8 +5,8 @@ import CoreData
 final class ListBookTable: UITableViewController {
 
     var list: List!
+    var displayedSortOrder: BookSort!
     private var cachedListNames: [String]!
-    private var ignoreNotifications = false
 
     private var searchController: UISearchController!
     private var dataSource: ListBookDiffableDataSource!
@@ -45,10 +45,13 @@ final class ListBookTable: UITableViewController {
         searchController.delegate = self
         navigationItem.searchController = searchController
 
+        displayedSortOrder = list.order
         let sortManager = SortManager<ListItem>(tableView) { [unowned self] in
             self.dataSource.getItem(at: $0)
         }
-        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), sortManager: sortManager, searchController: searchController, onContentChanged: reloadHeaders)
+        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), sortManager: sortManager, searchController: searchController) { [weak self] in
+            self?.reloadHeaders()
+        }
 
         // Configure the empty state manager to detect when the table becomes empty
         emptyStateManager = ListBookTableEmptyDataSetManager(tableView: tableView, navigationBar: navigationController?.navigationBar, navigationItem: navigationItem, searchController: searchController, list: list)
@@ -130,7 +133,16 @@ final class ListBookTable: UITableViewController {
     }
 
     @objc private func configureNavigationItem() {
-        guard let editDoneButton = navigationItem.rightBarButtonItem else { assertionFailure(); return }
+        configureEditButton()
+        searchController.searchBar.isEnabled = !isEditing
+        configureListTitleField()
+    }
+    
+    private func configureEditButton() {
+        guard let editDoneButton = navigationItem.rightBarButtonItem else {
+            assertionFailure()
+            return
+        }
         editDoneButton.isEnabled = {
             if let listNameField = listNameField {
                 if !listNameField.isEditing { return true }
@@ -139,7 +151,9 @@ final class ListBookTable: UITableViewController {
             }
             return true
         }()
-        searchController.searchBar.isEnabled = !isEditing
+    }
+    
+    private func configureListTitleField() {
         if isEditing {
             if listNameField == nil {
                 guard let navigationBar = navigationController?.navigationBar else {
@@ -168,14 +182,12 @@ final class ListBookTable: UITableViewController {
         // result controller.
         self.dataSource.controller = buildResultsControllerAndFetch()
         dataSource.updateData(animate: true)
+        displayedSortOrder = list.order
 
-        // Put the top row at the "middle", so that the top row is not right up at the top of the table
-        //is this needed? tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .middle, animated: false)
         UserEngagement.logEvent(.changeListSortOrder)
     }
 
     @objc private func objectContextChanged(_ notification: Notification) {
-        guard !ignoreNotifications else { return }
         guard let userInfo = notification.userInfo else { return }
 
         if let deletedObjects = userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>, deletedObjects.contains(list!) {
@@ -196,16 +208,18 @@ final class ListBookTable: UITableViewController {
                 }
                 self.dataSource.updateData(snapshot, animate: false)
             }
+
+            let updatedLists = updatedObjects.compactMap { $0 as? List }
+            if updatedLists.contains(list) {
+                configureListTitleField()
+                if displayedSortOrder != list.order {
+                    sortOrderChanged()
+                }
+            }
         }
 
         // Repopulate the list names cache
         cachedListNames = List.names(fromContext: PersistentStoreManager.container.viewContext)
-    }
-
-    private func ignoringSaveNotifications(_ block: () -> Void) {
-        ignoreNotifications = true
-        block()
-        ignoreNotifications = false
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
