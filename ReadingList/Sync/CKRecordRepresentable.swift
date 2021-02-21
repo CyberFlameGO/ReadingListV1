@@ -13,9 +13,8 @@ protocol CKRecordRepresentable: NSManagedObject {
     static var allCKRecordKeys: [String] { get }
     var isDeleted: Bool { get }
 
-    var remoteIdentifier: String? { get set }
+    var remoteIdentifier: String { get set }
     var ckRecordEncodedSystemFields: Data? { get set }
-    func newRecordName() -> String
 
     func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String]
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String?
@@ -41,21 +40,15 @@ extension CKRecordRepresentable {
     }
 
     func newRecordID() -> CKRecord.ID {
-        let recordName = newRecordName()
-        return CKRecord.ID(recordName: recordName, zoneID: SyncConstants.zoneID)
+        return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
     }
 
     func buildCKRecord(ckRecordKeys: [String]? = nil) -> CKRecord {
         let ckRecord: CKRecord
         if let encodedSystemFields = ckRecordEncodedSystemFields, let ckRecordFromSystemFields = CKRecord(systemFieldsData: encodedSystemFields) {
             ckRecord = ckRecordFromSystemFields
-        } else if let remoteIdentifier = remoteIdentifier {
-            ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID))
         } else {
-            let recordName = newRecordName()
-            // TODO: Perhaps we should store the proposed record name on the ListItems always?
-            remoteIdentifier = recordName
-            ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: CKRecord.ID(recordName: recordName, zoneID: SyncConstants.zoneID))
+            ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: newRecordID())
         }
 
         let keysToStore: [String]
@@ -71,10 +64,9 @@ extension CKRecordRepresentable {
         return ckRecord
     }
 
-    func setSystemAndIdentifierFields(from ckRecord: CKRecord) {
-        guard remoteIdentifier == nil || remoteIdentifier == ckRecord.recordID.recordName else {
-            logger.error("Attempted to update local object with remoteIdentifier \(remoteIdentifier!) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
-            logger.error("\(Thread.callStackSymbols.joined(separator: "\n"))")
+    func setSystemFields(from ckRecord: CKRecord) {
+        if remoteIdentifier != ckRecord.recordID.recordName {
+            logger.error("Attempted to update local object with remoteIdentifier \(remoteIdentifier) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
             fatalError("Attempted to update local object from CKRecord with different remoteIdentifier")
         }
 
@@ -83,15 +75,13 @@ extension CKRecordRepresentable {
             return
         }
 
-        if remoteIdentifier == nil {
-            remoteIdentifier = ckRecord.recordID.recordName
-        }
         setSystemFields(ckRecord)
     }
 
     @discardableResult
     static func create(from ckRecord: CKRecord, in context: NSManagedObjectContext) -> Self {
         let newItem = Self(context: context)
+        newItem.remoteIdentifier = ckRecord.recordID.recordName
         newItem.update(from: ckRecord, excluding: [])
         return newItem
     }
@@ -101,7 +91,7 @@ extension CKRecordRepresentable {
      change are not updated.
     */
     func update(from ckRecord: CKRecord, excluding excludedKeys: [String]?) {
-        setSystemAndIdentifierFields(from: ckRecord)
+        setSystemFields(from: ckRecord)
 
         // TODO Consider whether we should skip metadata updates if the change token is the same (as noticed in the above function call)
         // This book may have local changes which we don't want to overwrite with the values on the server.

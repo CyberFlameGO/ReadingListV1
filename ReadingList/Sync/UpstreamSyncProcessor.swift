@@ -180,9 +180,6 @@ class UpstreamSyncProcessor {
                     guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
                     return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
                 }
-
-            // Buiding the CKRecord can in some cases cause updates to the managed object; save if this is the case
-            self.syncContext.saveIfChanged()
         }
     }
 
@@ -282,11 +279,15 @@ class UpstreamSyncProcessor {
                     logger.error("Could not find local object for CKRecord.")
                     return
                 }
+                // TODO We should probably re-upload this somehow. Another buffer of non-uploaded records?
                 localObject.setSystemFields(nil)
             } else {
                 logger.error("Unhandled error \(uploadError.code.name) for CKRecord \(record.recordID.recordName)")
             }
         }
+        
+        // TODO: We are not handling deletion failures at all. Do they need handling? Does any error exist which represents anything other than
+        // "the item was already deleted"?
 
         syncContext.saveIfChanged()
         if !refetchIDs.isEmpty {
@@ -301,7 +302,7 @@ class UpstreamSyncProcessor {
         guard !records.isEmpty else { return }
         let dataLookup = LocalDataMatcher(syncContext: syncContext, types: orderedTypesToSync)
         for record in records {
-            dataLookup.lookupLocalObject(for: record)?.setSystemAndIdentifierFields(from: record)
+            dataLookup.lookupLocalObject(for: record)?.setSystemFields(from: record)
         }
         syncContext.saveAndLogIfErrored()
         logger.info("Completed updating \(records.count) local model(s) after upload")

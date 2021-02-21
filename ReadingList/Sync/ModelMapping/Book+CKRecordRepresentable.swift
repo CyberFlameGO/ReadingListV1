@@ -8,17 +8,6 @@ extension Book: CKRecordRepresentable {
 
     @NSManaged var ckRecordEncodedSystemFields: Data?
 
-    func newRecordName() -> String {
-        if let googleBooksId = googleBooksId {
-            return "gbid:\(googleBooksId)"
-        } else if let manualBookId = manualBookId {
-            return "mid:\(manualBookId)"
-        } else {
-            logger.critical("Book \(objectID.uriRepresentation().path) has neither Google Books ID nor Manual Book ID")
-            fatalError("No google book or manual book ID")
-        }
-    }
-
     func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String] {
         return CKRecordKey(rawValue: ckRecordKey)?.localPropertyKeys() ?? []
     }

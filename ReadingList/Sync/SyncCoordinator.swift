@@ -53,11 +53,11 @@ final class SyncCoordinator {
 
     func start() {
         logger.info("SyncCoordinator starting")
+        self.cloudOperationQueue.resume()
         self.cloudKitInitialiser.prepareCloudEnvironment { [weak self] in
             guard let self = self else { return }
             logger.info("Cloud environment prepared")
 
-            self.cloudOperationQueue.resume()
             self.downstreamProcessor.enqueueFetchRemoteChanges()
             self.upstreamProcessor.start(storeCoordinator: self.persistentStoreCoordinator)
 

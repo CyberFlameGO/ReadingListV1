@@ -6,7 +6,7 @@ extension ListItem: CKRecordRepresentable {
     static let ckRecordType = "ListItem"
     static let allCKRecordKeys = ListItemCKRecordKey.allCases.map(\.rawValue)
     @NSManaged var ckRecordEncodedSystemFields: Data?
-    @NSManaged var remoteIdentifier: String?
+    @NSManaged var remoteIdentifier: String
 
     static func matchCandidateItemForRemoteRecord(_ record: CKRecord) -> NSPredicate {
         guard record.recordType == ckRecordType else {
@@ -66,20 +66,6 @@ extension ListItem: CKRecordRepresentable {
             }
             setValue(matchingList, forKey: #keyPath(ListItem.list))
         }
-    }
-
-    func newRecordName() -> String {
-        guard let book = book, let bookRemoteIdentifier = book.remoteIdentifier else {
-            logger.critical("Missing book remote identifier while generating ListItem name; using UUID")
-            return UUID().uuidString
-        }
-        guard let list = list, let listRemoteIdentifier = list.remoteIdentifier else {
-            logger.critical("Missing list remote identifier while generating ListItem name; using UUID")
-            return UUID().uuidString
-        }
-        // Using a remoteIdentifier which is unique for a book/list combination means that we won't be able to
-        // insert duplicate book entries into a list.
-        return ListItemRecordName(bookRemoteIdentifier: bookRemoteIdentifier, listRemoteIdentifier: listRemoteIdentifier).fullRecordName
     }
 
     func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String] {

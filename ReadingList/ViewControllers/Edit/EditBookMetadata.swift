@@ -33,6 +33,7 @@ final class EditBookMetadata: FormViewController {
         self.book = Book(context: editBookContext)
         self.book.manualBookId = UUID().uuidString
         self.book.setDefaultReadDates(for: bookToCreateReadState)
+        self.book.setRemoteIdentifier()
         self.isAddingNewBook = true
     }
 
@@ -244,6 +245,10 @@ final class EditBookMetadata: FormViewController {
             <<< LabelRow {
                 $0.title = "CloudKit Change Tag"
                 $0.value = book.buildCKRecord().recordChangeTag
+            }
+            <<< LabelRow {
+                $0.title = "Remote Identifier"
+                $0.value = book.remoteIdentifier
             }
         #endif
 

@@ -17,5 +17,6 @@ class ListItem: NSManagedObject {
         self.book = book
         self.sort = sort
         self.list = list
+        self.remoteIdentifier = ListItemRecordName(bookRemoteIdentifier: book.remoteIdentifier, listRemoteIdentifier: list.remoteIdentifier).fullRecordName
     }
 }

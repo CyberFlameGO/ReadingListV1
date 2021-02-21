@@ -19,13 +19,8 @@ struct CKReferenceResolver {
         let results = try! context.fetch(fetchRequest) as! [ListItem]
         logger.info("\(results.count) unresolved ListItems to fix")
         for result in results {
-            guard let remoteIdentifier = result.remoteIdentifier else {
-                logger.error("ListItem was missing bookRemoteIdentifier; deleting")
-                result.delete()
-                continue
-            }
-            guard let recordName = ListItemRecordName(listItemRecordName: remoteIdentifier) else {
-                logger.critical("Could not parse ListItem remote identifier \(remoteIdentifier)")
+            guard let recordName = ListItemRecordName(listItemRecordName: result.remoteIdentifier) else {
+                logger.critical("Could not parse ListItem remote identifier \(result.remoteIdentifier)")
                 result.delete()
                 continue
             }
@@ -34,7 +29,7 @@ struct CKReferenceResolver {
                 bookFetchRequest.predicate = Book.withRemoteIdentifier(recordName.bookRemoteIdentifier)
                 bookFetchRequest.fetchLimit = 1
                 if let matchingBook = try! context.fetch(bookFetchRequest).first {
-                    logger.info("Resolved book \(recordName.bookRemoteIdentifier) on list item \(remoteIdentifier)")
+                    logger.info("Resolved book \(recordName.bookRemoteIdentifier) on list item \(result.remoteIdentifier)")
                     result.setValue(matchingBook, forKeyPath: #keyPath(ListItem.book))
                 } else {
                     logger.warning("Could not find book with remoteIdentifier \(recordName.bookRemoteIdentifier)")
@@ -46,7 +41,7 @@ struct CKReferenceResolver {
                 listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(List.remoteIdentifier), recordName.listRemoteIdentifier)
                 listFetchRequest.fetchLimit = 1
                 if let matchingList = try! context.fetch(listFetchRequest).first {
-                    logger.info("Resolved list \(recordName.listRemoteIdentifier) on list item \(remoteIdentifier)")
+                    logger.info("Resolved list \(recordName.listRemoteIdentifier) on list item \(result.remoteIdentifier)")
                     result.setValue(matchingList, forKeyPath: #keyPath(ListItem.list))
                 } else {
                     logger.warning("Could not find list with remoteIdentifier \(recordName.listRemoteIdentifier)")

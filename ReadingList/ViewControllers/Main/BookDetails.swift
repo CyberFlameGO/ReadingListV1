@@ -607,8 +607,11 @@ struct BookDetails_Previews: PreviewProvider {
             Subject(context: PersistentStoreManager.container.viewContext, name: "Science")
         ]
         let list1 = List(context: PersistentStoreManager.container.viewContext, name: "Fiction")
+        list1.setRemoteIdentifier()
         let list2 = List(context: PersistentStoreManager.container.viewContext, name: "Science Fiction")
+        list2.setRemoteIdentifier()
         let list3 = List(context: PersistentStoreManager.container.viewContext, name: "Wish List")
+        list3.setRemoteIdentifier()
         list1.addBooks([book])
         list2.addBooks([book])
         list3.addBooks([book])

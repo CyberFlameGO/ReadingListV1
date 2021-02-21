@@ -44,10 +44,6 @@ extension List: CKRecordRepresentable {
         }
     }
 
-    func newRecordName() -> String {
-        UUID().uuidString
-    }
-
     func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String] {
         guard let ckKey = ListCKRecordKey(rawValue: ckRecordKey) else { return [] }
         return ckKey.localKeys()
@@ -63,14 +59,6 @@ extension CKRecord {
         get { return self.object(forKey: key.rawValue) }
         set { self.setObject(newValue, forKey: key.rawValue) }
     }
-
-//    func changedBookKeys() -> [Book.CKRecordKey] {
-//        return changedKeys().compactMap { Book.CKRecordKey(rawValue: $0) }
-//    }
-//
-//    func presentBookKeys() -> [Book.CKRecordKey] {
-//        return allKeys().compactMap { Book.CKRecordKey(rawValue: $0) }
-//    }
 }
 
 enum ListCKRecordKey: String, CaseIterable { //swiftlint:disable redundant_string_enum_value
@@ -93,17 +81,5 @@ enum ListCKRecordKey: String, CaseIterable { //swiftlint:disable redundant_strin
         case .sort: return [#keyPath(List.sort)]
         case .order: return [#keyPath(List.order)]
         }
-    }
-}
-
-extension String {
-
-    func fromBase64() -> String? {
-        guard let data = Data(base64Encoded: self) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-
-    func toBase64() -> String {
-        return Data(self.utf8).base64EncodedString()
     }
 }

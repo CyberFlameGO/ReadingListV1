@@ -7,7 +7,7 @@ class List: NSManagedObject {
     @NSManaged var name: String
     @NSManaged var order: BookSort
     @NSManaged var sort: Int32
-    @NSManaged var remoteIdentifier: String?
+    @NSManaged var remoteIdentifier: String
     @NSManaged private(set) var custom: Bool
 
     /** The item which hold a book-index pair for each book in this list */
@@ -24,6 +24,10 @@ class List: NSManagedObject {
         if let maxSort = List.maxSort(fromContext: context) {
             self.sort = maxSort + 1
         }
+    }
+
+    func setRemoteIdentifier() {
+        remoteIdentifier = UUID().uuidString
     }
 
     func removeBook(_ book: Book) {
@@ -74,14 +78,11 @@ class List: NSManagedObject {
         return context.getMaximum(sortValueKeyPath: \List.sort)
     }
 
-    class func getOrCreate(inContext context: NSManagedObjectContext, withName name: String) -> List {
+    class func get(inContext context: NSManagedObjectContext, withName name: String) -> List? {
         let listFetchRequest = NSManagedObject.fetchRequest(List.self, limit: 1)
         listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(Subject.name), name)
         listFetchRequest.returnsObjectsAsFaults = false
-        if let existingList = (try! context.fetch(listFetchRequest)).first {
-            return existingList
-        }
-        return List(context: context, name: name)
+        return (try! context.fetch(listFetchRequest)).first
     }
 }
 

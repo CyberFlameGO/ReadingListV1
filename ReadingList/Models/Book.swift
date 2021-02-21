@@ -44,7 +44,7 @@ class Book: NSManagedObject {
         addedWhen = Date()
     }
 
-    @NSManaged var remoteIdentifier: String?
+    @NSManaged var remoteIdentifier: String
 
     func setToRead() {
         readState = .toRead
@@ -223,6 +223,17 @@ class Book: NSManagedObject {
         for subject in subjects where subject.books.count == 1 {
             subject.delete()
             os_log("Orphaned subject %{public}s deleted.", type: .info, subject.name)
+        }
+    }
+    
+    func setRemoteIdentifier() {
+        if let googleBooksId = googleBooksId {
+            remoteIdentifier = "gbid:\(googleBooksId)"
+        } else if let manualBookId = manualBookId {
+            remoteIdentifier = "mid:\(manualBookId)"
+        } else {
+            logger.critical("Book \(objectID.uriRepresentation().path) has neither Google Books ID nor Manual Book ID")
+            fatalError("No google book or manual book ID")
         }
     }
 }

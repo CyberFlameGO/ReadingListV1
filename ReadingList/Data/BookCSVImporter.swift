@@ -68,7 +68,13 @@ class BookCSVParserDelegate: CSVParserDelegate {
 
     private func attach(_ listIndexes: [BookCSVImportRow.ListIndex], to book: Book) {
         for listIndex in listIndexes {
-            let list = List.getOrCreate(inContext: context, withName: listIndex.listName)
+            let list: List
+            if let exisingList = List.get(inContext: context, withName: listIndex.listName) {
+                list = exisingList
+            } else {
+                list = List(context: context, name: listIndex.listName)
+                list.setRemoteIdentifier()
+            }
             if let existingListItem = Array(book.listItems).first(where: { $0.list == list }) {
                 existingListItem.sort = listIndex.index
             } else {
