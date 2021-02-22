@@ -196,25 +196,31 @@ final class ListBookTable: UITableViewController {
             return
         }
 
+        var updatedObjects: Set<NSManagedObject> = []
+        if let userInfoUpdatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+            updatedObjects.formUnion(userInfoUpdatedObjects)
+        }
+        if let refreshedObjects = userInfo[NSRefreshedObjectsKey] as? Set<NSManagedObject> {
+            updatedObjects.formUnion(refreshedObjects)
+        }
+            
         // The fetched results controller only detects changes to the ListItem, not only related objects such as the Book.
         // This means that book changes don't get reflected in this screen straight-away. To address this, check each save
         // to see whether any updated objects were books which have ListItems which associate with this list.
-        if let updatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-            let updatedBooks = updatedObjects.compactMap { $0 as? Book }
-            if !updatedBooks.isEmpty {
-                var snapshot = self.dataSource.snapshot()
-                for updatedBook in updatedBooks {
-                    snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
-                }
-                self.dataSource.updateData(snapshot, animate: false)
+        let updatedBooks = updatedObjects.compactMap { $0 as? Book }
+        if !updatedBooks.isEmpty {
+            var snapshot = self.dataSource.snapshot()
+            for updatedBook in updatedBooks {
+                snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
             }
+            self.dataSource.updateData(snapshot, animate: false)
+        }
 
-            let updatedLists = updatedObjects.compactMap { $0 as? List }
-            if updatedLists.contains(list) {
-                configureListTitleField()
-                if displayedSortOrder != list.order {
-                    sortOrderChanged()
-                }
+        let updatedLists = updatedObjects.compactMap { $0 as? List }
+        if updatedLists.contains(list) {
+            configureListTitleField()
+            if displayedSortOrder != list.order {
+                sortOrderChanged()
             }
         }
 
