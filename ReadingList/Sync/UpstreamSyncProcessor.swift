@@ -140,8 +140,6 @@ class UpstreamSyncProcessor {
             ckRecords.append(contentsOf: objects.map { $0.buildCKRecord() })
         }
 
-        // building CKRecord sometimes creates remote name; save this
-        syncContext.saveIfChanged()
         return ckRecords
     }
 
