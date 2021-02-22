@@ -6,6 +6,13 @@ import os.log
 struct SyncConstants {
     static let remoteIdentifierKeyPath = "remoteIdentifier"
     static let zoneID = CKRecordZone.ID(zoneName: "ReadingListZone", ownerName: CKCurrentUserDefaultName)
+    static let recordSchemaVersionKey = "recordSchemaVersion"
+    static let recordSchemaVersion: RecordSchemaVersion = .twoPointZeroPointZero
+}
+
+enum RecordSchemaVersion: Int {
+    /// App version 2.0.0
+    case twoPointZeroPointZero = 0
 }
 
 protocol CKRecordRepresentable: NSManagedObject {
@@ -39,17 +46,15 @@ extension CKRecordRepresentable {
         return NSPredicate(format: "%K == %@", SyncConstants.remoteIdentifierKeyPath, id)
     }
 
-    func newRecordID() -> CKRecord.ID {
-        return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
-    }
-
     func buildCKRecord(ckRecordKeys: [String]? = nil) -> CKRecord {
         let ckRecord: CKRecord
         if let encodedSystemFields = ckRecordEncodedSystemFields, let ckRecordFromSystemFields = CKRecord(systemFieldsData: encodedSystemFields) {
             ckRecord = ckRecordFromSystemFields
         } else {
-            ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: newRecordID())
+            let recordID = CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
+            ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: recordID)
         }
+        ckRecord[SyncConstants.recordSchemaVersionKey] = SyncConstants.recordSchemaVersion.rawValue
 
         let keysToStore: [String]
         if let changedCKRecordKeys = ckRecordKeys, !changedCKRecordKeys.isEmpty {

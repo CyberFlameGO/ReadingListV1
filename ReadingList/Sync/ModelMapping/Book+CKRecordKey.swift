@@ -7,6 +7,7 @@ extension Book {
      Encapsulates the mapping between Book objects and CKRecord values
      */
     enum CKRecordKey: String, CaseIterable { //swiftlint:disable redundant_string_enum_value
+        // REMEMBER to update the record schema version if we adjust this mapping
         case title = "title"
         case subtitle = "subtitle"
         case authors = "authors"

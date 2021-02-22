@@ -40,6 +40,16 @@ class DownstreamSyncProcessor {
         operation.recordChangedBlock = { record -> Void in
             logger.trace("recordChangedBlock for CKRecord with ID \(record.recordID.recordName)")
             recordsByType.append(record, to: record.recordType)
+            guard let recordSchemaVersion = record[SyncConstants.recordSchemaVersionKey] as? Int else {
+                logger.critical("CKRecord did not have a \(SyncConstants.recordSchemaVersionKey) property")
+                self.coordinator?.handleUnexpectedResponse()
+                return
+            }
+            if recordSchemaVersion > SyncConstants.recordSchemaVersion.rawValue {
+                logger.error("CKRecord schema version was \(recordSchemaVersion) but the current schema version is \(SyncConstants.recordSchemaVersion.rawValue)")
+                operation.cancel()
+                self.coordinator?.disableSyncDueOutOfDateLocalAppVersion()
+            }
         }
 
         var deletionIDs = [CKRecord.RecordType: [CKRecord.ID]]()

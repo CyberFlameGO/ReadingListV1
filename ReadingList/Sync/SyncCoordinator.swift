@@ -99,6 +99,13 @@ final class SyncCoordinator {
         UserEngagement.logError(SyncCoordinatorError.unexpectedResponse)
         stop()
     }
+    
+    func disableSyncDueOutOfDateLocalAppVersion() {
+        logger.error("Stopping SyncCoordinator because the server contains data which is from a newer version of the app")
+        stop()
+        // TODO Consider caching this info and erasing upon upgrade, so we don't keep attempting to get data on every startup (maybe it doesn't matter)
+        // TODO Expose this info the UI 
+    }
 
     func forceFullResync() {
         cloudOperationQueue.cancelAll()

@@ -107,6 +107,7 @@ extension CKRecord {
 }
 
 enum ListItemCKRecordKey: String, CaseIterable { //swiftlint:disable redundant_string_enum_value
+    // REMEMBER to update the record schema version if we adjust this mapping
     case book = "book"
     case list = "list"
     case sort = "sort" //swiftlint:enable redundant_string_enum_value
