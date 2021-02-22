@@ -85,9 +85,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         logger.info("Application received remote notification")
-        guard GeneralSettings.iCloudSyncEnabled else { return }
+        guard GeneralSettings.iCloudSyncEnabled else {
+            completionHandler(.noData)
+            return
+        }
         if let syncCoordinator = self.syncCoordinator {
-            syncCoordinator.enqueueFetchRemoteChanges(completion: completionHandler)
+            if syncCoordinator.isRunning {
+                syncCoordinator.enqueueFetchRemoteChanges(completion: completionHandler)
+            } else {
+                logger.info("SyncCoordinator was not running; remote notification did not lead to new data")
+                completionHandler(.failed)
+            }
         } else {
             logger.info("Persistent store was not initialised; waiting for initialisation to complete")
             persistentStoreObserver = NotificationCenter.default.publisher(for: .didCompletePersistentStoreInitialisation, object: nil)

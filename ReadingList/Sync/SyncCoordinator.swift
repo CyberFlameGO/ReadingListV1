@@ -88,6 +88,10 @@ final class SyncCoordinator {
         cloudOperationQueue.suspend()
         cloudOperationQueue.cancelAll()
     }
+    
+    var isRunning: Bool {
+        !cloudOperationQueue.operationQueue.isSuspended
+    }
 
     func disableSync() {
         stop()
