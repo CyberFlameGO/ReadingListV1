@@ -42,7 +42,7 @@ class CloudKitInitialiser {
         logger.error("Operation failed with code: \(ckError.code.name)")
         if ckError.code == .userDeletedZone {
             guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.disableSync()
+            coordinator.disableSync(reason: .cloudDataDeleted)
             return true
         } else if ckError.code == .notAuthenticated {
             guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }

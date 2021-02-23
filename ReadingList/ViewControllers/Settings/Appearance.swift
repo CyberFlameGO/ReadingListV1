@@ -71,7 +71,7 @@ struct Appearance: View {
 
             Section(
                 header: HeaderText("Book Details", inset: inset),
-                footer: FooterText("Enable Expanded Descriptions to automatically show each book's full description.", inset: inset)
+                footer: Footer("Enable Expanded Descriptions to automatically show each book's full description.", inset: inset)
             ) {
                 Toggle(isOn: $settings.showAmazonLinks) {
                     Text("Show Amazon Links")

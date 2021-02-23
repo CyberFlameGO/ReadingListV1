@@ -13,6 +13,7 @@ final class SyncCoordinator {
     let typesToSync: [CKRecordRepresentable.Type]
     let downstreamProcessor: DownstreamSyncProcessor
     let upstreamProcessor: UpstreamSyncProcessor
+    private(set) var disabledReason: SyncDisabledReason?
 
     init(persistentStoreCoordinator: NSPersistentStoreCoordinator, orderedTypesToSync: [CKRecordRepresentable.Type]) {
         self.persistentStoreCoordinator = persistentStoreCoordinator
@@ -53,6 +54,7 @@ final class SyncCoordinator {
 
     func start() {
         logger.info("SyncCoordinator starting")
+        self.disabledReason = nil
         self.cloudOperationQueue.resume()
         self.cloudKitInitialiser.prepareCloudEnvironment { [weak self] in
             guard let self = self else { return }
@@ -65,7 +67,7 @@ final class SyncCoordinator {
                 .sink { [weak self] _ in
                     guard let self = self else { return }
                     logger.info("CKAccountChanged; stopping SyncCoordinator and disabling iCloud Sync")
-                    self.disableSync()
+                    self.disableSync(reason: .userAccountChanged)
                 }.store(in: &self.cancellables)
 
             // Monitoring the network reachabiity will allow us to automatically re-do work when network connectivity resumes
@@ -93,20 +95,23 @@ final class SyncCoordinator {
         !cloudOperationQueue.operationQueue.isSuspended
     }
 
-    func disableSync() {
+    func disableSync(reason: SyncDisabledReason) {
         stop()
         GeneralSettings.iCloudSyncEnabled = false
+        disabledReason = reason
     }
 
     func handleUnexpectedResponse() {
         logger.critical("Stopping SyncCoordinator due to unexpected response")
         UserEngagement.logError(SyncCoordinatorError.unexpectedResponse)
+        disabledReason = .unexpectedResponse
         stop()
     }
     
     func disableSyncDueOutOfDateLocalAppVersion() {
         logger.error("Stopping SyncCoordinator because the server contains data which is from a newer version of the app")
         stop()
+        disabledReason = .outOfDateApp
         // TODO Consider caching this info and erasing upon upgrade, so we don't keep attempting to get data on every startup (maybe it doesn't matter)
         // TODO Expose this info the UI 
     }

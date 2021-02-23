@@ -32,7 +32,7 @@ struct Privacy: View {
             }
             Section(
                 header: HeaderText("Reporting", inset: inset),
-                footer: FooterText("""
+                footer: Footer("""
                 Crash reports can be automatically sent to help me detect and fix issues. Analytics can \
                 be used to help gather usage statistics for different features. This never includes any \
                 details of your books.\

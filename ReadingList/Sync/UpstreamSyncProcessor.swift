@@ -228,11 +228,11 @@ class UpstreamSyncProcessor {
         } else if ckError.code == .userDeletedZone {
             guard let coordinator = coordinator else { fatalError("Missing sync coordinator") }
             logger.info("Disabling sync due to deleted record zone")
-            coordinator.disableSync()
+            coordinator.disableSync(reason: .cloudDataDeleted)
         } else if ckError.code == .notAuthenticated {
             guard let coordinator = coordinator else { fatalError("Missing sync coordinator") }
             logger.info("Disabling sync due to user not being authenticated")
-            coordinator.disableSync()
+            coordinator.stop()
         } else if let retryDelay = ckError.retryAfterSeconds {
             logger.info("Instructed to delay for \(retryDelay) seconds: suspending operation queue")
             cloudOperationQueue.suspend()
