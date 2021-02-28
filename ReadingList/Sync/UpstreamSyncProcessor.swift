@@ -25,11 +25,17 @@ class UpstreamSyncProcessor {
     private var cancellables = Set<AnyCancellable>()
 
     func start(storeCoordinator: NSPersistentStoreCoordinator) {
+        self.syncContext.refreshAllObjects()
         NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: storeCoordinator)
             .sink(receiveValue: handleLocalChangeNotification)
             .store(in: &cancellables)
         self.bufferBookmark = latestConfirmedUploadedTransaction
         self.enqueueUploadOperations()
+    }
+
+    func stop() {
+        self.cancellables.forEach { $0.cancel() }
+        self.cancellables.removeAll()
     }
 
     func enqueueUploadOperations() {
@@ -44,10 +50,10 @@ class UpstreamSyncProcessor {
     }
 
     private func handleLocalChangeNotification(_ notification: Notification) {
-        logger.debug("Detected local change")
+        logger.debug("Detected local change \(String(describing: notification.userInfo?[NSPersistentHistoryTokenKey]))")
         cloudOperationQueue.addBlock {
-            self.syncContext.perform {
-                logger.debug("Merging changes into syncContext")
+            self.syncContext.performAndWait {
+                logger.debug("Merging changes into syncContext \(String(describing: notification.userInfo?[NSPersistentHistoryTokenKey]))")
                 self.syncContext.mergeChanges(fromContextDidSave: notification)
                 self.enqueueUploadOperations()
             }
@@ -55,7 +61,10 @@ class UpstreamSyncProcessor {
     }
 
     private func addNewTransactionsToBuffer(since bookmark: Date) {
-        let transactions = historyFetcher.fetch(fromDate: bookmark)
+        // Although history fetcher tries to exclude syncContext transactions, sometimes the fetch request for history items
+        // cannot be obtained (for unknown reasons) and so a predicate cannot be appended. So perform the filtering here too.
+        let transactions = historyFetcher.fetch(fromDate: bookmark).filter { $0.contextName != syncContext.name }
+
         localTransactionsPendingPushCompletion.append(contentsOf: transactions)
         if let lastTransaction = transactions.last {
             bufferBookmark = lastTransaction.timestamp
@@ -63,8 +72,6 @@ class UpstreamSyncProcessor {
     }
 
     private func enqueueUploadOperationsForPendingTransactions() {
-        let uploadOperation = uploadRecordsOperation()
-
         let updateBufferBookmarkOperation = BlockOperation {
             let transaction = self.localTransactionsPendingPushCompletion.removeFirst()
             logger.info("Updating confirmed pushed timestamp to \(transaction.timestamp)")
@@ -72,7 +79,10 @@ class UpstreamSyncProcessor {
             self.historyFetcher.deleteHistory(beforeToken: transaction.token)
             self.enqueueUploadOperations()
         }
-        updateBufferBookmarkOperation.addDependency(uploadOperation)
+
+        let uploadOperation = uploadRecordsOperation {
+            updateBufferBookmarkOperation.cancel()
+        }
 
         let buildCKRecordsOperation = BlockOperation {
             logger.info("Building CKRecords for upload")
@@ -97,22 +107,16 @@ class UpstreamSyncProcessor {
                 }
             }
         }
+
         uploadOperation.addDependency(buildCKRecordsOperation)
+        updateBufferBookmarkOperation.addDependency(uploadOperation)
 
         cloudOperationQueue.addOperations([buildCKRecordsOperation, uploadOperation, updateBufferBookmarkOperation])
         logger.info("Upload operations added to operation queue")
     }
 
     private func enqueueUploadOfAllObjects() {
-        let uploadOperation = uploadRecordsOperation()
         var timestamp: Date?
-        let fetchRecordsOperation = BlockOperation {
-            logger.info("Fetching all records to upload")
-            timestamp = Date()
-            let allRecords = self.getAllObjectCkRecords()
-            uploadOperation.recordsToSave = allRecords
-        }
-        uploadOperation.addDependency(fetchRecordsOperation)
 
         let updateBookmarkOperation = BlockOperation {
             guard let timestamp = timestamp else { fatalError("Unexpected nil timestamp") }
@@ -123,8 +127,20 @@ class UpstreamSyncProcessor {
             // In case there have been any local changes since we started uploading all records:
             self.enqueueUploadOperations()
         }
-        updateBookmarkOperation.addDependency(uploadOperation)
 
+        let uploadOperation = uploadRecordsOperation {
+            updateBookmarkOperation.cancel()
+        }
+
+        let fetchRecordsOperation = BlockOperation {
+            logger.info("Fetching all records to upload")
+            timestamp = Date()
+            let allRecords = self.getAllObjectCkRecords() // TODO Perhaps just un-uploaded objects?
+            uploadOperation.recordsToSave = allRecords
+        }
+
+        uploadOperation.addDependency(fetchRecordsOperation)
+        updateBookmarkOperation.addDependency(uploadOperation)
         cloudOperationQueue.addOperations([fetchRecordsOperation, uploadOperation, updateBookmarkOperation])
     }
 
@@ -180,16 +196,24 @@ class UpstreamSyncProcessor {
                     guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
                     return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
                 }
+
+            if !uploadOpertion.recordsToSave!.isEmpty {
+                logger.debug("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
+            }
+            if !uploadOpertion.recordIDsToDelete!.isEmpty {
+                logger.debug("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
+            }
         }
     }
 
-    private func uploadRecordsOperation() -> CKModifyRecordsOperation {
+    private func uploadRecordsOperation(didFail: @escaping () -> Void) -> CKModifyRecordsOperation {
         let operation = CKModifyRecordsOperation()
         operation.modifyRecordsCompletionBlock = { [weak self] serverRecords, _, error in
             guard let self = self else { return }
             self.syncContext.performAndWait {
                 if let error = error {
                     self.handleUploadError(error, records: operation.recordsToSave ?? [], ids: operation.recordIDsToDelete ?? [])
+                    didFail()
                 } else {
                     logger.info("Completed upload. Updating local models with server record data.")
                     guard let serverRecords = serverRecords else {
@@ -206,10 +230,9 @@ class UpstreamSyncProcessor {
         return operation
     }
 
-    private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID]) { //swiftlint:disable:this cyclomatic_complexity
+    private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID]) {
         guard let ckError = error as? CKError else {
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.handleUnexpectedResponse()
+            self.coordinator.handleUnexpectedResponse()
             return
         }
 
@@ -220,6 +243,7 @@ class UpstreamSyncProcessor {
 
         logger.error("Upload error occurred with CKError code \(ckError.code.name)")
         if ckError.code == .limitExceeded {
+            // TODO: Implement!
             logger.error("CloudKit batch limit exceeded, sending records in chunks")
             fatalError("Not implemented: batch uploads. Here we should divide the records in chunks and upload in batches instead of trying everything at once.")
         } else if ckError.code == .operationCancelled {
@@ -227,13 +251,11 @@ class UpstreamSyncProcessor {
         } else if ckError.code == .partialFailure {
             handlePartialUploadFailure(ckError, records: records, ids: ids)
         } else if ckError.code == .userDeletedZone {
-            guard let coordinator = coordinator else { fatalError("Missing sync coordinator") }
             logger.info("Disabling sync due to deleted record zone")
-            coordinator.disableSync(reason: .cloudDataDeleted)
+            self.coordinator.disableSync(reason: .cloudDataDeleted)
         } else if ckError.code == .notAuthenticated {
-            guard let coordinator = coordinator else { fatalError("Missing sync coordinator") }
             logger.info("Disabling sync due to user not being authenticated")
-            coordinator.stop()
+            self.coordinator.stop()
         } else if let retryDelay = ckError.retryAfterSeconds {
             logger.info("Instructed to delay for \(retryDelay) seconds: suspending operation queue")
             cloudOperationQueue.suspend()
@@ -249,7 +271,7 @@ class UpstreamSyncProcessor {
         }
     }
 
-    private func handlePartialUploadFailure(_ ckError: CKError, records: [CKRecord], ids: [CKRecord.ID]) { //swiftlint:disable:this cyclomatic_complexity
+    private func handlePartialUploadFailure(_ ckError: CKError, records: [CKRecord], ids: [CKRecord.ID]) {
         guard let errorsByItemId = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] else {
             logger.error("Missing CKPartialErrorsByItemIDKey data")
             self.coordinator.handleUnexpectedResponse()

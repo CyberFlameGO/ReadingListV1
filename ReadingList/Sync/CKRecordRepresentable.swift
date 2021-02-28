@@ -89,7 +89,7 @@ extension CKRecordRepresentable {
     }
 
     @discardableResult
-    static func create(from ckRecord: CKRecord, in context: NSManagedObjectContext) -> Self {
+    static func createObject(from ckRecord: CKRecord, in context: NSManagedObjectContext) -> Self {
         let newItem = Self(context: context)
         newItem.remoteIdentifier = ckRecord.recordID.recordName
         newItem.update(from: ckRecord, excluding: [])
@@ -116,6 +116,10 @@ extension CKRecordRepresentable {
         }
     }
 
+    /**
+     Merges the data in the object with the data from the record, selectively preferring data on a property-by-property basis via
+     some heuristics about what data is most likely to be more recent.
+     */
     func merge(with ckRecord: CKRecord) {
         setSystemFields(from: ckRecord)
 
@@ -128,12 +132,10 @@ extension CKRecordRepresentable {
                 setValue(recordValue, for: key)
                 return
             }
-            if recordValue.isPreferableTo(existingValue) {
+            if !existingValue.isPreferableTo(recordValue) {
                 setValue(recordValue, for: key)
             }
         }
-
-        // TODO We need a way to push the merge result back to the server
     }
 }
 

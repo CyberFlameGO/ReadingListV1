@@ -40,8 +40,6 @@ struct PersistentHistoryFetcher {
 
         // Only look at transactions not from the excluded context
         fetchRequest.predicate = NSPredicate(format: "%K != %@", #keyPath(NSPersistentHistoryTransaction.contextName), excludeHistoryFromContextWithName)
-        // TODO: We are not specifying an order here. Is the ordering automatic?
-        //fetchRequest.sortDescriptors = [NSSortDescriptor(\NSPersistentHistoryTransaction.timestamp)]
         fetchRequest.fetchLimit = limit
 
         return fetchRequest

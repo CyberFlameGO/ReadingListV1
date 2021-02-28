@@ -220,14 +220,18 @@ class DownstreamSyncProcessor {
 
     private func saveRecordDataLocally(_ ckRecord: CKRecord) {
         if let localObject = localDataMatcher.lookupLocalObject(for: ckRecord) {
-            logger.info("Updating \(ckRecord.recordType) from CKRecord \(ckRecord.recordID.recordName)")
-
-            let keysPendingUpdate = self.coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
-            if !keysPendingUpdate.isEmpty {
-                logger.info("Excluding key from update due to pending upload: \(keysPendingUpdate.joined(separator: ", "))")
+            if localObject.ckRecordEncodedSystemFields == nil {
+                logger.info("Merging \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
+                localObject.merge(with: ckRecord)
+                // TODO we need to somehow enqueue this to be repushed. Setting the transaction author perhaps?
+            } else {
+                logger.info("Updating \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
+                let keysPendingUpdate = self.coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
+                if !keysPendingUpdate.isEmpty {
+                    logger.info("Excluding key from update due to pending upload: \(keysPendingUpdate.joined(separator: ", "))")
+                }
+                localObject.update(from: ckRecord, excluding: keysPendingUpdate)
             }
-            localObject.update(from: ckRecord, excluding: keysPendingUpdate)
-            logger.info("Updated metadata for CKRecord \(ckRecord.recordID.recordName) on object \(localObject.objectID.uriRepresentation().path)")
         } else {
             logger.info("Creating new \(ckRecord.recordType) with record name \(ckRecord.recordID.recordName)")
 
@@ -235,7 +239,7 @@ class DownstreamSyncProcessor {
                 logger.error("No type corresponding to \(ckRecord.recordType) found")
                 return
             }
-            type.create(from: ckRecord, in: syncContext)
+            type.createObject(from: ckRecord, in: syncContext)
         }
     }
 }

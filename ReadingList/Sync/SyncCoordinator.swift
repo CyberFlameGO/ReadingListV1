@@ -14,6 +14,7 @@ final class SyncCoordinator {
     let downstreamProcessor: DownstreamSyncProcessor
     let upstreamProcessor: UpstreamSyncProcessor
     private(set) var disabledReason: SyncDisabledReason?
+    private(set) var isStarted = false
 
     init(persistentStoreCoordinator: NSPersistentStoreCoordinator, orderedTypesToSync: [CKRecordRepresentable.Type]) {
         self.persistentStoreCoordinator = persistentStoreCoordinator
@@ -53,11 +54,14 @@ final class SyncCoordinator {
     }
 
     func start() {
+        if isStarted {
+            logger.error("SyncCoordinator asked to start but has already started")
+            return
+        }
         logger.info("SyncCoordinator starting")
         self.disabledReason = nil
         self.cloudOperationQueue.resume()
-        self.cloudKitInitialiser.prepareCloudEnvironment { [weak self] in
-            guard let self = self else { return }
+        self.cloudKitInitialiser.prepareCloudEnvironment { [unowned self] in
             logger.info("Cloud environment prepared")
 
             self.downstreamProcessor.enqueueFetchRemoteChanges()
@@ -77,6 +81,8 @@ final class SyncCoordinator {
             NotificationCenter.default.publisher(for: .reachabilityChanged)
                 .sink(receiveValue: self.networkConnectivityDidChange)
                 .store(in: &self.cancellables)
+
+            isStarted = true
         }
     }
 
@@ -89,8 +95,12 @@ final class SyncCoordinator {
         cancellables.forEach {
             $0.cancel()
         }
+        cancellables.removeAll()
+        upstreamProcessor.stop()
+        
         cloudOperationQueue.suspend()
         cloudOperationQueue.cancelAll()
+        isStarted = false
     }
 
     var isRunning: Bool {
@@ -120,7 +130,7 @@ final class SyncCoordinator {
     func forceFullResync() {
         cloudOperationQueue.cancelAll()
         cloudOperationQueue.addBlock {
-            self.syncContext.perform {
+            self.syncContext.performAndWait {
                 self.eraseSyncMetadata()
 
                 self.downstreamProcessor.resetChangeTracking()
