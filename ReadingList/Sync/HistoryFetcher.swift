@@ -34,15 +34,12 @@ struct PersistentHistoryFetcher {
 
     private func fetchRequest(limit: Int = 0) -> NSFetchRequest<NSFetchRequestResult>? {
         guard let fetchRequest = NSPersistentHistoryTransaction.fetchRequest else {
-            logger.error("Failed to delete persistent history")
+            logger.error("NSPersistentHistoryTransaction.fetchRequest was nil")
             return nil
         }
 
         // Only look at transactions not from the excluded context
-        fetchRequest.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
-            NSPredicate(format: "%K == NULL", #keyPath(NSPersistentHistoryTransaction.contextName)),
-            NSPredicate(format: "%K != %@", #keyPath(NSPersistentHistoryTransaction.contextName), excludeHistoryFromContextWithName)
-        ])
+        fetchRequest.predicate = NSPredicate(format: "%K != %@", #keyPath(NSPersistentHistoryTransaction.contextName), excludeHistoryFromContextWithName)
         // TODO: We are not specifying an order here. Is the ordering automatic?
         //fetchRequest.sortDescriptors = [NSSortDescriptor(\NSPersistentHistoryTransaction.timestamp)]
         fetchRequest.fetchLimit = limit

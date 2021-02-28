@@ -83,13 +83,13 @@ struct About: View {
         .possiblyInsetGroupedListStyle(inset: hostingSplitView.isSplit)
         .navigationBarTitle("About")
     }
-    
+
     func gatherLogFile() {
         DispatchQueue.global(qos: .userInteractive).async {
             guard let fileLogger = DDLog.allLoggers.compactMap({
                 $0 as? DDFileLogger
             }).first else { fatalError("No file logger found") }
-            
+
             var emailAttachmentData: Data?
             if let logFilePath = fileLogger.logFileManager.sortedLogFilePaths.first {
                 let logFileURL = URL(fileURLWithPath: logFilePath)
@@ -107,7 +107,7 @@ struct About: View {
             }
         }
     }
-    
+
     var legacyMailAlert: Alert {
         Alert(
             title: Text("Copy Email Address?"),
@@ -151,7 +151,7 @@ struct About: View {
             ]
         )
     }
-    
+
     var emailSheet: some View {
         MailView(
             isShowing: $isShowingMailView,

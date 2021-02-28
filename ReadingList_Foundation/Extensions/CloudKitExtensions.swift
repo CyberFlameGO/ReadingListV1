@@ -3,26 +3,25 @@ import CloudKit
 
 public extension CKRecord {
     convenience init?(systemFieldsData: Data) {
-        let coder = NSKeyedUnarchiver(forReadingWith: systemFieldsData)
+        guard let coder = try? NSKeyedUnarchiver(forReadingFrom: systemFieldsData) else { return nil }
         coder.requiresSecureCoding = true
         self.init(coder: coder)
         coder.finishDecoding()
     }
 
     func encodedSystemFields() -> Data {
-        let data = NSMutableData()
-        let coder = NSKeyedArchiver(forWritingWith: data)
+        let coder = NSKeyedArchiver(requiringSecureCoding: true)
         coder.requiresSecureCoding = true
         encodeSystemFields(with: coder)
         coder.finishEncoding()
-        return data as Data
+        return coder.encodedData
     }
 
     /**
      Note that if a CKAsset is provided, and the asset's file URL does not exist on this device, will return false
      (unless they both don't exist).
     */
-    static func valuesAreEqual(left: CKRecordValue?, right: CKRecordValue?) -> Bool {
+    static func valuesAreEqual(left: CKRecordValue?, right: CKRecordValue?) -> Bool { //swiftlint:disable:this cyclomatic_complexity
         if left == nil && right == nil { return true }
         guard let left = left, let right = right else { return false }
 

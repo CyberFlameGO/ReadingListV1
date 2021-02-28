@@ -49,8 +49,10 @@ extension CKRecordRepresentable {
     func buildCKRecord(ckRecordKeys: [String]? = nil) -> CKRecord {
         let ckRecord: CKRecord
         if let encodedSystemFields = ckRecordEncodedSystemFields, let ckRecordFromSystemFields = CKRecord(systemFieldsData: encodedSystemFields) {
+            logger.debug("Building CKRecord for \(entity.name!) with name \(remoteIdentifier) from stored record data")
             ckRecord = ckRecordFromSystemFields
         } else {
+            logger.debug("Building CKRecord for \(entity.name!) with name \(remoteIdentifier)")
             let recordID = CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
             ckRecord = CKRecord(recordType: Self.ckRecordType, recordID: recordID)
         }
@@ -69,18 +71,21 @@ extension CKRecordRepresentable {
         return ckRecord
     }
 
-    func setSystemFields(from ckRecord: CKRecord) {
+    /// Returns whether the system fields were updated.
+    @discardableResult
+    func setSystemFields(from ckRecord: CKRecord) -> Bool {
         if remoteIdentifier != ckRecord.recordID.recordName {
             logger.error("Attempted to update local object with remoteIdentifier \(remoteIdentifier) from a CKRecord which has record name \(ckRecord.recordID.recordName)")
             fatalError("Attempted to update local object from CKRecord with different remoteIdentifier")
         }
 
         if let existingCKRecordSystemFields = getSystemFieldsRecord(), existingCKRecordSystemFields.recordChangeTag == ckRecord.recordChangeTag {
-            logger.debug("CKRecord \(ckRecord.recordID.recordName) has same change tag as local book; no update made")
-            return
+            return false
         }
 
+        logger.debug("CKRecord \(ckRecord.recordID.recordName) system fields updated")
         setSystemFields(ckRecord)
+        return true
     }
 
     @discardableResult
@@ -96,16 +101,53 @@ extension CKRecordRepresentable {
      change are not updated.
     */
     func update(from ckRecord: CKRecord, excluding excludedKeys: [String]?) {
-        setSystemFields(from: ckRecord)
+        guard setSystemFields(from: ckRecord) else {
+            logger.debug("CKRecord \(ckRecord.recordID.recordName) has same change tag as local book; no update made")
+            return
+        }
 
-        // TODO Consider whether we should skip metadata updates if the change token is the same (as noticed in the above function call)
-        // This book may have local changes which we don't want to overwrite with the values on the server.
         for key in Self.allCKRecordKeys {
+            // This book may have local changes which we don't want to overwrite with the values on the server.
             if let excludedKeys = excludedKeys, excludedKeys.contains(key) {
                 logger.debug("CKRecordKey '\(key)' not used to update local store due to pending local change")
                 continue
             }
             setValue(ckRecord[key], for: key)
         }
+    }
+
+    func merge(with ckRecord: CKRecord) {
+        setSystemFields(from: ckRecord)
+
+        for key in Self.allCKRecordKeys {
+            guard let recordValue: CKRecordValueProtocol = ckRecord[key] else {
+                // Prefer data over nil
+                continue
+            }
+            guard let existingValue = getValue(for: key) else {
+                setValue(recordValue, for: key)
+                return
+            }
+            if recordValue.isPreferableTo(existingValue) {
+                setValue(recordValue, for: key)
+            }
+        }
+
+        // TODO We need a way to push the merge result back to the server
+    }
+}
+
+extension CKRecordValueProtocol {
+    func isPreferableTo(_ other: CKRecordValueProtocol) -> Bool {
+        if let selfString = self as? String, let otherString = other as? String {
+            return selfString.count > otherString.count
+        }
+        if let selfDate = self as? Date, let otherDate = other as? Date {
+            return selfDate > otherDate
+        }
+        if let selfInt = self as? Int, let otherInt = other as? Int {
+            return selfInt > otherInt
+        }
+        return false
     }
 }

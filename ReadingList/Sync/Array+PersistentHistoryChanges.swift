@@ -21,11 +21,11 @@ extension Array where Element == NSPersistentHistoryChange {
     /// A description suitable for debugging
     func description() -> String {
         return map {
-            var base = "\($0.changeType.description) \($0.changedObjectID.uriRepresentation().path)"
+            var result = "\($0.changeType.description) \($0.changedObjectID.uriRepresentation().path)"
             if $0.changeType == .update {
-                base += " [\($0.updatedProperties?.map(\.name).joined(separator: ", ") ?? "")]"
+                result += " [\($0.updatedProperties?.map(\.name).joined(separator: ", ") ?? "")]"
             }
-            return base
+            return result
         }.joined(separator: "\n")
     }
 }

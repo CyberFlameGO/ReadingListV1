@@ -5,7 +5,7 @@ import UIKit
 import PersistedPropertyWrapper
 
 class DownstreamSyncProcessor {
-    weak var coordinator: SyncCoordinator?
+    weak var coordinator: SyncCoordinator!
     let orderedTypesToSync: [CKRecordRepresentable.Type]
     let syncContext: NSManagedObjectContext
     let cloudOperationQueue: ConcurrentCKQueue
@@ -42,13 +42,13 @@ class DownstreamSyncProcessor {
             recordsByType.append(record, to: record.recordType)
             guard let recordSchemaVersion = record[SyncConstants.recordSchemaVersionKey] as? Int else {
                 logger.critical("CKRecord did not have a \(SyncConstants.recordSchemaVersionKey) property")
-                self.coordinator?.handleUnexpectedResponse()
+                self.coordinator.handleUnexpectedResponse()
                 return
             }
             if recordSchemaVersion > SyncConstants.recordSchemaVersion.rawValue {
                 logger.error("CKRecord schema version was \(recordSchemaVersion) but the current schema version is \(SyncConstants.recordSchemaVersion.rawValue)")
                 operation.cancel()
-                self.coordinator?.disableSyncDueOutOfDateLocalAppVersion()
+                self.coordinator.disableSyncDueOutOfDateLocalAppVersion()
             }
         }
 
@@ -64,7 +64,7 @@ class DownstreamSyncProcessor {
             if !recordsByType.isEmpty || !deletionIDs.isEmpty {
                 anyChanges = true
             }
-            
+
             logger.info("Saving syncContext after record change import")
             self.syncContext.saveIfChanged()
             if let newToken = newToken {
@@ -135,8 +135,7 @@ class DownstreamSyncProcessor {
                     self.handleDownloadError(error)
                 } else {
                     guard let records = records else {
-                        guard let syncCoordinator = self.coordinator else { fatalError("Missing sync coordinator") }
-                        syncCoordinator.handleUnexpectedResponse()
+                        self.coordinator.handleUnexpectedResponse()
                         return
                     }
                     self.commitServerChangesToDatabase(with: Array(records.values), deletedRecordIDs: [])
@@ -150,8 +149,7 @@ class DownstreamSyncProcessor {
 
     private func handleDownloadError(_ error: Error) {
         guard let ckError = error as? CKError else {
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.handleUnexpectedResponse()
+            self.coordinator.handleUnexpectedResponse()
             return
         }
 
@@ -172,9 +170,8 @@ class DownstreamSyncProcessor {
                 self.cloudOperationQueue.resume()
             }
         } else {
-            logger.critical("Unhandled error response")
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.handleUnexpectedResponse()
+            logger.critical("Unhandled error response \(ckError)")
+            self.coordinator.handleUnexpectedResponse()
         }
     }
 
@@ -223,15 +220,12 @@ class DownstreamSyncProcessor {
 
     private func saveRecordDataLocally(_ ckRecord: CKRecord) {
         if let localObject = localDataMatcher.lookupLocalObject(for: ckRecord) {
-            if localObject.isDeleted {
-                logger.info("Local \(ckRecord.recordType) was deleted; skipping local update")
-                return
-            }
-
             logger.info("Updating \(ckRecord.recordType) from CKRecord \(ckRecord.recordID.recordName)")
 
-            guard let coordinator = coordinator else { fatalError("Missing coordinator") }
-            let keysPendingUpdate = coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
+            let keysPendingUpdate = self.coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
+            if !keysPendingUpdate.isEmpty {
+                logger.info("Excluding key from update due to pending upload: \(keysPendingUpdate.joined(separator: ", "))")
+            }
             localObject.update(from: ckRecord, excluding: keysPendingUpdate)
             logger.info("Updated metadata for CKRecord \(ckRecord.recordID.recordName) on object \(localObject.objectID.uriRepresentation().path)")
         } else {
@@ -241,7 +235,7 @@ class DownstreamSyncProcessor {
                 logger.error("No type corresponding to \(ckRecord.recordType) found")
                 return
             }
-            let newObject = type.create(from: ckRecord, in: syncContext)
+            type.create(from: ckRecord, in: syncContext)
         }
     }
 }

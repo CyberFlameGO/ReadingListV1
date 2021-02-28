@@ -64,10 +64,12 @@ final class SyncCoordinator {
             self.upstreamProcessor.start(storeCoordinator: self.persistentStoreCoordinator)
 
             NotificationCenter.default.publisher(for: .CKAccountChanged)
-                .sink { [weak self] _ in
-                    guard let self = self else { return }
-                    logger.info("CKAccountChanged; stopping SyncCoordinator and disabling iCloud Sync")
-                    self.disableSync(reason: .userAccountChanged)
+                .sink { [unowned self] _ in
+                    logger.info("CKAccountChanged; verifying user record ID")
+                    if self.cloudOperationQueue.operationQueue.isSuspended {
+                        self.cloudOperationQueue.resume()
+                    }
+                    self.cloudKitInitialiser.verifyUserRecordID()
                 }.store(in: &self.cancellables)
 
             // Monitoring the network reachabiity will allow us to automatically re-do work when network connectivity resumes
@@ -90,7 +92,7 @@ final class SyncCoordinator {
         cloudOperationQueue.suspend()
         cloudOperationQueue.cancelAll()
     }
-    
+
     var isRunning: Bool {
         !cloudOperationQueue.operationQueue.isSuspended
     }
@@ -107,13 +109,12 @@ final class SyncCoordinator {
         disabledReason = .unexpectedResponse
         stop()
     }
-    
+
     func disableSyncDueOutOfDateLocalAppVersion() {
         logger.error("Stopping SyncCoordinator because the server contains data which is from a newer version of the app")
         stop()
         disabledReason = .outOfDateApp
         // TODO Consider caching this info and erasing upon upgrade, so we don't keep attempting to get data on every startup (maybe it doesn't matter)
-        // TODO Expose this info the UI 
     }
 
     func forceFullResync() {

@@ -5,7 +5,7 @@ import Logging
 
 class CloudKitInitialiser {
     private let cloudOperationQueue: ConcurrentCKQueue
-    weak var coordinator: SyncCoordinator?
+    weak var coordinator: SyncCoordinator!
 
     init(cloudOperationQueue: ConcurrentCKQueue) {
         self.cloudOperationQueue = cloudOperationQueue
@@ -17,10 +17,15 @@ class CloudKitInitialiser {
     @Persisted("SyncEngine_PrivateSubscriptionKey", defaultValue: false)
     private var createdPrivateSubscription: Bool
 
+    @Persisted("SyncEngine_UserRecordName")
+    var userRecordName: String?
+
     static let privateSubscriptionId = "\(SyncConstants.zoneID.zoneName).subscription"
 
     func prepareCloudEnvironment(completion: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
+            self.verifyUserRecordID()
+
             self.createCustomZoneIfNeeded()
             self.cloudOperationQueue.operationQueue.waitUntilAllOperationsAreFinished()
             guard self.createdCustomZone else { return }
@@ -33,19 +38,56 @@ class CloudKitInitialiser {
         }
     }
 
+    func verifyUserRecordID() {
+        fetchUserRecordID { recordID, error in
+            if let recordID = recordID {
+                if let userRecordName = self.userRecordName, recordID.recordName != userRecordName {
+                    logger.error("User record was previous stored as \(userRecordName), but is now \(recordID.recordName)")
+                    self.coordinator.disableSync(reason: .userAccountChanged)
+                } else {
+                    logger.info("User record name: \(recordID.recordName)")
+                    self.userRecordName = recordID.recordName
+                }
+            } else if let error = error {
+                logger.error("Unhandled error fetching user record ID \(error)")
+                if !self.handleCloudPreparationError(error, rerunOperation: self.verifyUserRecordID) {
+                    self.coordinator.stop()
+                }
+            } else {
+                self.coordinator.handleUnexpectedResponse()
+            }
+        }
+    }
+
+    func fetchUserRecordID(completion: @escaping (CKRecord.ID?, Error?) -> Void) {
+        let operation = BlockOperation {
+            let dispatchGroup = DispatchGroup()
+            dispatchGroup.enter()
+            // We aren't provided an Operation based way to fetch the user record ID, so wrap it in a Block Operation,
+            // and use a DispatchGroup to block that block until the callback has been run.
+            CKContainer.default().fetchUserRecordID {
+                completion($0, $1)
+                dispatchGroup.leave()
+            }
+            dispatchGroup.wait()
+        }
+
+        // So that user account verifications can jump the queue
+        operation.queuePriority = .high
+        cloudOperationQueue.addOperation(operation)
+    }
+
     private func handleCloudPreparationError(_ error: Error, rerunOperation: () -> Void) -> Bool {
         guard let ckError = error as? CKError else {
-            self.coordinator?.handleUnexpectedResponse()
+            self.coordinator.handleUnexpectedResponse()
             return true
         }
 
         logger.error("Operation failed with code: \(ckError.code.name)")
         if ckError.code == .userDeletedZone {
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
             coordinator.disableSync(reason: .cloudDataDeleted)
             return true
         } else if ckError.code == .notAuthenticated {
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
             coordinator.stop()
             return true
         } else if let retryAfter = ckError.retryAfterSeconds {
@@ -76,8 +118,7 @@ class CloudKitInitialiser {
 
             if let error = error {
                 if !self.handleCloudPreparationError(error, rerunOperation: self.createCustomZoneIfNeeded) {
-                    guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-                    coordinator.stop()
+                    self.coordinator.stop()
                 }
             } else {
                 logger.info("Zone created successfully")
@@ -136,8 +177,7 @@ class CloudKitInitialiser {
 
             if let error = error {
                 if !self.handleCloudPreparationError(error, rerunOperation: self.createPrivateSubscriptionsIfNeeded) {
-                    guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-                    coordinator.stop()
+                    self.coordinator.stop()
                 }
             } else {
                 logger.info("Private subscription created successfully")

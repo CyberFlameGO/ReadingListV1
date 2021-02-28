@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import CoreData
+import Combine
 
 final class ListBookTable: UITableViewController {
 
@@ -11,6 +12,8 @@ final class ListBookTable: UITableViewController {
     private var searchController: UISearchController!
     private var dataSource: ListBookDiffableDataSource!
     private var emptyStateManager: ListBookTableEmptyDataSetManager!
+
+    var cancellables = Set<AnyCancellable>()
 
     private var listNameField: UITextField? {
         get { return navigationItem.titleView as? UITextField }
@@ -58,9 +61,18 @@ final class ListBookTable: UITableViewController {
         dataSource.emptyDetectionDelegate = emptyStateManager
         dataSource.updateData(animate: false)
 
-        NotificationCenter.default.addObserver(self, selector: #selector(objectContextChanged(_:)),
-                                               name: .NSManagedObjectContextObjectsDidChange,
-                                               object: PersistentStoreManager.container.viewContext)
+        PersistentStoreManager.container.viewContext.updatedObjectsPublisher().sink { [weak self] ids in
+            guard let self = self else { return }
+            let objects = Set(ids.map(PersistentStoreManager.container.viewContext.object(with:)))
+            self.respondToDataChanges(updatedObjects: objects)
+        }.store(in: &cancellables)
+
+        PersistentStoreManager.container.viewContext.deletedObjectsPublisher().sink { [weak self] ids in
+            guard let self = self else { return }
+            if ids.contains(self.list.objectID) {
+                self.navigationController?.popViewController(animated: false)
+            }
+        }.store(in: &cancellables)
     }
 
     private func buildResultsControllerAndFetch() -> NSFetchedResultsController<ListItem> {
@@ -137,7 +149,7 @@ final class ListBookTable: UITableViewController {
         searchController.searchBar.isEnabled = !isEditing
         configureListTitleField()
     }
-    
+
     private func configureEditButton() {
         guard let editDoneButton = navigationItem.rightBarButtonItem else {
             assertionFailure()
@@ -152,7 +164,7 @@ final class ListBookTable: UITableViewController {
             return true
         }()
     }
-    
+
     private func configureListTitleField() {
         if isEditing {
             if listNameField == nil {
@@ -187,23 +199,7 @@ final class ListBookTable: UITableViewController {
         UserEngagement.logEvent(.changeListSortOrder)
     }
 
-    @objc private func objectContextChanged(_ notification: Notification) {
-        guard let userInfo = notification.userInfo else { return }
-
-        if let deletedObjects = userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>, deletedObjects.contains(list!) {
-            // If the list was deleted, pop back. This can't happen through any normal means at the moment.
-            navigationController?.popViewController(animated: false)
-            return
-        }
-
-        var updatedObjects: Set<NSManagedObject> = []
-        if let userInfoUpdatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-            updatedObjects.formUnion(userInfoUpdatedObjects)
-        }
-        if let refreshedObjects = userInfo[NSRefreshedObjectsKey] as? Set<NSManagedObject> {
-            updatedObjects.formUnion(refreshedObjects)
-        }
-            
+    private func respondToDataChanges(updatedObjects: Set<NSManagedObject>) {
         // The fetched results controller only detects changes to the ListItem, not only related objects such as the Book.
         // This means that book changes don't get reflected in this screen straight-away. To address this, check each save
         // to see whether any updated objects were books which have ListItems which associate with this list.
@@ -213,7 +209,7 @@ final class ListBookTable: UITableViewController {
             for updatedBook in updatedBooks {
                 snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
             }
-            self.dataSource.updateData(snapshot, animate: false)
+            self.dataSource.updateData(snapshot, animate: true)
         }
 
         let updatedLists = updatedObjects.compactMap { $0 as? List }

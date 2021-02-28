@@ -39,12 +39,6 @@ class BookTableViewCell: UITableViewCell {
         resetUI()
     }
 
-    func requiresUpdate(_ book: Book, includeReadDates: Bool = true) -> Bool {
-        // TODO: We are not checking for image differences
-        return titleLabel.text != book.title || authorsLabel.text != book.authors.fullNames
-            || (coverImage.image == nil && book.coverImage != nil) || ((coverImage.image == nil) != (book.coverImage == nil))
-    }
-
     func configureFrom(_ book: Book, includeReadDates: Bool = true) {
         titleLabel.text = book.titleAndSubtitle
         authorsLabel.text = book.authors.fullNames

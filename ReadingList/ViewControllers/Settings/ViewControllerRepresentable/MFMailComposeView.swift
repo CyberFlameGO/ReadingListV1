@@ -8,7 +8,7 @@ struct MailView: UIViewControllerRepresentable {
     let messageBody: String?
     let subject: String?
     let attachments: [Attachment]?
-    
+
     struct Attachment {
         let data: Data
         let mimeType: String

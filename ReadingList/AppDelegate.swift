@@ -57,7 +57,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         launchManager.handleApplicationDidBecomeActive()
-        
+
         if let syncCoordinator = self.syncCoordinator, GeneralSettings.iCloudSyncEnabled {
             syncCoordinator.enqueueFetchRemoteChanges()
         }

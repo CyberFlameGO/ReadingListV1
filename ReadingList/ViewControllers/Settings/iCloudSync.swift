@@ -33,7 +33,7 @@ struct CloudSync: View {
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
     @ObservedObject var settings = CloudSyncSettings.settings
     @State var accountStatus = CKAccountStatus.couldNotDetermine
-    @State var syncDisabledReason: SyncDisabledReason? = nil
+    @State var syncDisabledReason: SyncDisabledReason?
 
     func updateAccountStatus() {
         CKContainer.default().accountStatus { status, _ in
@@ -87,7 +87,7 @@ struct CloudSyncFooter: View {
     let accountStatus: CKAccountStatus
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
     let syncDisabledReason: SyncDisabledReason?
-    
+
     var text: String {
         if accountStatus == .available {
             return "Configure data should be synchronised across all your devices via iCloud."
@@ -113,7 +113,7 @@ struct CloudSyncFooter: View {
 
 struct CloudSyncDisabledError: View {
     let syncDisabledReason: SyncDisabledReason
-    
+
     var body: some View {
         VStack(alignment: .center, spacing: 16) {
             HStack {

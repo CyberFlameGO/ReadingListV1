@@ -5,7 +5,7 @@ import Combine
 import PersistedPropertyWrapper
 
 class UpstreamSyncProcessor {
-    weak var coordinator: SyncCoordinator?
+    weak var coordinator: SyncCoordinator!
     let cloudOperationQueue: ConcurrentCKQueue
     let syncContext: NSManagedObjectContext
     let orderedTypesToSync: [CKRecordRepresentable.Type]
@@ -152,7 +152,9 @@ class UpstreamSyncProcessor {
             // before generating our CKRecords.
             let changesAndObjects = changes.filter { $0.changeType != .delete }
                 .compactMap { change -> (change: NSPersistentHistoryChange, managedObject: CKRecordRepresentable)? in
-                    guard let managedObject = self.syncContext.object(with: change.changedObjectID) as? CKRecordRepresentable else { return nil }
+                    guard let managedObject = try? self.syncContext.existingObject(with: change.changedObjectID) as? CKRecordRepresentable else {
+                        return nil
+                    }
                     return (change, managedObject)
                 }
             let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
@@ -192,8 +194,7 @@ class UpstreamSyncProcessor {
                     logger.info("Completed upload. Updating local models with server record data.")
                     guard let serverRecords = serverRecords else {
                         logger.error("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation")
-                        guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-                        coordinator.handleUnexpectedResponse()
+                        self.coordinator.handleUnexpectedResponse()
                         return
                     }
                     self.updateLocalModelsAfterUpload(with: serverRecords)
@@ -205,7 +206,7 @@ class UpstreamSyncProcessor {
         return operation
     }
 
-    private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID]) {
+    private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID]) { //swiftlint:disable:this cyclomatic_complexity
         guard let ckError = error as? CKError else {
             guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
             coordinator.handleUnexpectedResponse()
@@ -243,17 +244,15 @@ class UpstreamSyncProcessor {
                 self.cloudOperationQueue.resume()
             }
         } else {
-            logger.critical("Unhandled error response")
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.handleUnexpectedResponse()
+            logger.critical("Unhandled error response \(ckError)")
+            self.coordinator.handleUnexpectedResponse()
         }
     }
 
-    private func handlePartialUploadFailure(_ ckError: CKError, records: [CKRecord], ids: [CKRecord.ID]) {
+    private func handlePartialUploadFailure(_ ckError: CKError, records: [CKRecord], ids: [CKRecord.ID]) { //swiftlint:disable:this cyclomatic_complexity
         guard let errorsByItemId = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] else {
             logger.error("Missing CKPartialErrorsByItemIDKey data")
-            guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-            coordinator.handleUnexpectedResponse()
+            self.coordinator.handleUnexpectedResponse()
             return
         }
 
@@ -261,8 +260,7 @@ class UpstreamSyncProcessor {
         for record in records {
             guard let uploadError = errorsByItemId[record.recordID] as? CKError else {
                 logger.error("Missing CKError for record \(record.recordID.recordName)")
-                guard let coordinator = self.coordinator else { fatalError("Missing coordinator") }
-                coordinator.handleUnexpectedResponse()
+                self.coordinator.handleUnexpectedResponse()
                 return
             }
             if uploadError.code == .serverRecordChanged {
@@ -283,15 +281,14 @@ class UpstreamSyncProcessor {
                 logger.error("Unhandled error \(uploadError.code.name) for CKRecord \(record.recordID.recordName)")
             }
         }
-        
+
         // TODO: We are not handling deletion failures at all. Do they need handling? Does any error exist which represents anything other than
         // "the item was already deleted"?
 
         syncContext.saveIfChanged()
         if !refetchIDs.isEmpty {
-            guard let coordinator = coordinator else { fatalError("Missing coordinator") }
             logger.info("Requesting fetch for \(refetchIDs.count) records")
-            coordinator.requestFetch(for: refetchIDs)
+            self.coordinator.requestFetch(for: refetchIDs)
         }
         enqueueUploadOperations()
     }

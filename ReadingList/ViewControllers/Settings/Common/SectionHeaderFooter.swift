@@ -28,7 +28,7 @@ struct Footer<InnerView>: View where InnerView: View {
         self.view = Text(text)
         self.inset = inset
     }
-    
+
     init(inset: Bool, @ViewBuilder view: () -> InnerView) {
         self.view = view()
         self.inset = inset

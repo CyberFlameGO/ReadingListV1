@@ -67,7 +67,7 @@ public extension NSPersistentContainer {
     ///   - overwriting: If `true`, any existing copies of the persistent store will be replaced or updated. If `false`, existing copies will not be changed or remoted. When this is `false`, the destination persistent store file must not already exist.
     /// - Throws: `CopyPersistentStoreError`
     /// - Returns: Nothing. If no errors are thrown, all loaded persistent stores will be copied to the destination directory.
-    func copyPersistentStores(to destinationURL: URL, overwriting: Bool = false) throws {
+    func copyPersistentStores(to destinationURL: URL, overwriting: Bool = false) throws { //swiftlint:disable:this cyclomatic_complexity
         guard destinationURL.isFileURL else {
             throw CopyPersistentStoreErrors.invalidDestination("Destination URL must be a file URL")
         }

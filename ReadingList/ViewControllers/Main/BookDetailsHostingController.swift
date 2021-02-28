@@ -6,6 +6,7 @@ import CoreData
 
 class BookDetailsHostingController: UIHostingController<BookDetailsContainer> {
     private var bookContainer = BookContainer()
+    private var cancellables = Set<AnyCancellable>()
 
     init(_ book: Book) {
         super.init(rootView: BookDetailsContainer(bookContainer: bookContainer))
@@ -19,16 +20,14 @@ class BookDetailsHostingController: UIHostingController<BookDetailsContainer> {
     }
 
     private func registerDeletionObserver() {
-        NotificationCenter.default.addObserver(self, selector: #selector(onBookDeleted(_:)), name: .NSManagedObjectContextObjectsDidChange, object: PersistentStoreManager.container.viewContext)
-    }
-
-    @objc private func onBookDeleted(_ notification: Notification) {
-        guard let userInfo = notification.userInfo, let deletedObjects = userInfo[NSDeletedObjectsKey] as? NSSet else { return }
-        if let book = self.bookContainer.book, deletedObjects.contains(book) {
-            self.bookContainer.book = nil
-            self.splitViewController?.masterNavigationController.popViewController(animated: false)
-            self.configureNavigationItem()
-        }
+        PersistentStoreManager.container.viewContext.deletedObjectsPublisher().sink { [weak self] ids in
+            guard let self = self, let book = self.bookContainer.book else { return }
+            if ids.contains(book.objectID) {
+                self.bookContainer.book = nil
+                self.splitViewController?.masterNavigationController.popViewController(animated: false)
+                self.configureNavigationItem()
+            }
+        }.store(in: &cancellables)
     }
 
     func setBook(_ book: Book?) {
