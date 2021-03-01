@@ -6,7 +6,6 @@ import Combine
 import UIKit
 import Reachability
 
-@available(iOS 13.0, *)
 final class SyncCoordinator {
 
     private let persistentContainer: NSPersistentContainer

@@ -56,12 +56,6 @@ public extension NSManagedObject {
 
 public extension NSManagedObjectContext {
 
-    func performMergeChanges(from notification: Notification) {
-        perform {
-            self.mergeChanges(fromContextDidSave: notification)
-        }
-    }
-
     /**
      With a valid URL representation of a Managed Object ID, returns the managed object.
     */
@@ -83,20 +77,6 @@ public extension NSManagedObjectContext {
         } else {
             return nil
         }
-    }
-}
-
-public extension Notification {
-    var updatedObjects: Set<NSManagedObject>? {
-        return userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>
-    }
-
-    var insertedObjects: Set<NSManagedObject>? {
-        return userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject>
-    }
-
-    var deletedObjects: Set<NSManagedObject>? {
-        return userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject>
     }
 }
 

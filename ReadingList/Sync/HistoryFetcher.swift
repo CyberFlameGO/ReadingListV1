@@ -2,7 +2,6 @@ import Foundation
 import CoreData
 import os.log
 
-@available(iOS 13.0, *)
 struct PersistentHistoryFetcher {
     let context: NSManagedObjectContext
     let excludeHistoryFromContextWithName: String

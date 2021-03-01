@@ -21,7 +21,7 @@ class PersistentStoreManager {
         // Register our custom transformer for Author tranformable attributes
         AuthorTransformer.register()
 
-        // Set up the container describing a manually migarted store with persistent history enabled.
+        // Set up the container describing a manually migrated store with persistent history enabled.
         container = NSPersistentContainer(name: storeName)
         let description = NSPersistentStoreDescription(url: storeLocation)
         description.shouldInferMappingModelAutomatically = false

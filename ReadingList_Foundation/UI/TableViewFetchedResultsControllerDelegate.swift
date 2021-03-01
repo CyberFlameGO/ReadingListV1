@@ -11,7 +11,7 @@ extension UITableView: NSFetchedResultsControllerDelegate {
     public func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange object: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?) {
         switch type {
         case .update:
-            reloadRows(at: [indexPath!], with: .none)
+            reloadRows(at: [indexPath!], with: .automatic)
         case .insert:
             insertRows(at: [newIndexPath!], with: .automatic)
         case .move:

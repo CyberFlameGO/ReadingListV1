@@ -8,10 +8,6 @@ extension Book: CKRecordRepresentable {
 
     @NSManaged var ckRecordEncodedSystemFields: Data?
 
-    func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String] {
-        return CKRecordKey(rawValue: ckRecordKey)?.localPropertyKeys() ?? []
-    }
-
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return CKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }

@@ -1,12 +1,8 @@
 import Foundation
 import UIKit
 import CloudKit
-import SVProgressHUD
-import Reachability
-import CoreData
 import SwiftUI
 import PersistedPropertyWrapper
-import os.log
 
 class CloudSyncSettings: ObservableObject {
     private init() { }
@@ -55,7 +51,7 @@ struct CloudSync: View {
             ) {
                 Toggle(isOn: settings.$syncEnabled.binding.didSet { isEnabled in
                     guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
-                        os_log(.error, "SyncCoordinator nil when attempting to enable or disable iCloud sync")
+                        logger.error("SyncCoordinator nil when attempting to enable or disable iCloud sync")
                         return
                     }
                     if isEnabled {

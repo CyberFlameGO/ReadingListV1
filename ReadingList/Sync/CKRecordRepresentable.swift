@@ -23,7 +23,6 @@ protocol CKRecordRepresentable: NSManagedObject {
     var remoteIdentifier: String { get set }
     var ckRecordEncodedSystemFields: Data? { get set }
 
-    func localPropertyKeys(forCkRecordKey ckRecordKey: String) -> [String]
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String?
 
     static func matchCandidateItemForRemoteRecord(_ record: CKRecord) -> NSPredicate
