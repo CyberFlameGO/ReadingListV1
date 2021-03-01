@@ -1,5 +1,5 @@
 default_platform(:ios)
-xcversion(version: "12.2")
+xcversion(version: "12.4")
 
 platform :ios do
 
