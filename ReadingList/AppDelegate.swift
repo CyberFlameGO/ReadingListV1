@@ -46,7 +46,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func initialiseSyncCoordinator() {
         // Initialise the Sync Coordinator which will maintain iCloud synchronisation
         let syncCoordinator = SyncCoordinator(
-            persistentStoreCoordinator: PersistentStoreManager.container.persistentStoreCoordinator,
+            persistentContainer: PersistentStoreManager.container,
             orderedTypesToSync: [Book.self, List.self, ListItem.self]
         )
         self.syncCoordinator = syncCoordinator

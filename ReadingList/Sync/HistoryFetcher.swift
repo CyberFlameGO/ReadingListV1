@@ -20,7 +20,7 @@ struct PersistentHistoryFetcher {
             }
             historyResult = historyExecutionResult
         } catch {
-            logger.error("Failed to delete persistent history")
+            logger.error("Failed to fetch persistent history: \(error)")
             return []
         }
         return historyResult.result as! [NSPersistentHistoryTransaction]
@@ -51,7 +51,6 @@ struct PersistentHistoryFetcher {
             try context.execute(deletionRequest)
         } catch {
             logger.error("Failed to delete persistent history")
-            assertionFailure("Failed to delete persistent history")
         }
     }
 }

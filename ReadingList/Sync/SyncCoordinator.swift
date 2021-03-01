@@ -9,19 +9,19 @@ import Reachability
 @available(iOS 13.0, *)
 final class SyncCoordinator {
 
-    private let persistentStoreCoordinator: NSPersistentStoreCoordinator
+    private let persistentContainer: NSPersistentContainer
     let typesToSync: [CKRecordRepresentable.Type]
     let downstreamProcessor: DownstreamSyncProcessor
     let upstreamProcessor: UpstreamSyncProcessor
     private(set) var disabledReason: SyncDisabledReason?
     private(set) var isStarted = false
 
-    init(persistentStoreCoordinator: NSPersistentStoreCoordinator, orderedTypesToSync: [CKRecordRepresentable.Type]) {
-        self.persistentStoreCoordinator = persistentStoreCoordinator
+    init(persistentContainer: NSPersistentContainer, orderedTypesToSync: [CKRecordRepresentable.Type]) {
+        self.persistentContainer = persistentContainer
         typesToSync = orderedTypesToSync
-        syncContext = Self.buildSyncContext(storeCoordinator: persistentStoreCoordinator)
+        syncContext = Self.buildSyncContext(storeCoordinator: persistentContainer.persistentStoreCoordinator)
         downstreamProcessor = DownstreamSyncProcessor(syncContext: syncContext, types: orderedTypesToSync, cloudOperationQueue: cloudOperationQueue)
-        upstreamProcessor = UpstreamSyncProcessor(syncContext: syncContext, cloudOperationQueue: cloudOperationQueue, types: orderedTypesToSync)
+        upstreamProcessor = UpstreamSyncProcessor(container: persistentContainer, syncContext: syncContext, cloudOperationQueue: cloudOperationQueue, types: orderedTypesToSync)
 
         downstreamProcessor.coordinator = self
         upstreamProcessor.coordinator = self
@@ -65,7 +65,7 @@ final class SyncCoordinator {
             logger.info("Cloud environment prepared")
 
             self.downstreamProcessor.enqueueFetchRemoteChanges()
-            self.upstreamProcessor.start(storeCoordinator: self.persistentStoreCoordinator)
+            self.upstreamProcessor.start()
 
             NotificationCenter.default.publisher(for: .CKAccountChanged)
                 .sink { [unowned self] _ in
@@ -97,7 +97,7 @@ final class SyncCoordinator {
         }
         cancellables.removeAll()
         upstreamProcessor.stop()
-        
+
         cloudOperationQueue.suspend()
         cloudOperationQueue.cancelAll()
         isStarted = false

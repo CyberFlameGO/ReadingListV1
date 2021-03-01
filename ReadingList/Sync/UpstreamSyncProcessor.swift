@@ -6,12 +6,14 @@ import PersistedPropertyWrapper
 
 class UpstreamSyncProcessor {
     weak var coordinator: SyncCoordinator!
+    let container: NSPersistentContainer
     let cloudOperationQueue: ConcurrentCKQueue
     let syncContext: NSManagedObjectContext
     let orderedTypesToSync: [CKRecordRepresentable.Type]
     var localTransactionsPendingPushCompletion = [NSPersistentHistoryTransaction]()
 
-    init(syncContext: NSManagedObjectContext, cloudOperationQueue: ConcurrentCKQueue, types: [CKRecordRepresentable.Type]) {
+    init(container: NSPersistentContainer, syncContext: NSManagedObjectContext, cloudOperationQueue: ConcurrentCKQueue, types: [CKRecordRepresentable.Type]) {
+        self.container = container
         self.syncContext = syncContext
         self.cloudOperationQueue = cloudOperationQueue
         self.orderedTypesToSync = types
@@ -21,12 +23,13 @@ class UpstreamSyncProcessor {
     private(set) var latestConfirmedUploadedTransaction: Date?
 
     private var bufferBookmark: Date?
-    private lazy var historyFetcher = PersistentHistoryFetcher(context: syncContext, excludeHistoryFromContextWithName: syncContext.name!)
+    private var historyFetcher: PersistentHistoryFetcher!
     private var cancellables = Set<AnyCancellable>()
 
-    func start(storeCoordinator: NSPersistentStoreCoordinator) {
+    func start() {
         self.syncContext.refreshAllObjects()
-        NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: storeCoordinator)
+        historyFetcher = PersistentHistoryFetcher(context: self.container.newBackgroundContext(), excludeHistoryFromContextWithName: syncContext.name!)
+        NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: container.persistentStoreCoordinator)
             .sink(receiveValue: handleLocalChangeNotification)
             .store(in: &cancellables)
         self.bufferBookmark = latestConfirmedUploadedTransaction
@@ -50,20 +53,23 @@ class UpstreamSyncProcessor {
     }
 
     private func handleLocalChangeNotification(_ notification: Notification) {
-        logger.debug("Detected local change \(String(describing: notification.userInfo?[NSPersistentHistoryTokenKey]))")
-        cloudOperationQueue.addBlock {
-            self.syncContext.performAndWait {
-                logger.debug("Merging changes into syncContext \(String(describing: notification.userInfo?[NSPersistentHistoryTokenKey]))")
-                self.syncContext.mergeChanges(fromContextDidSave: notification)
-                self.enqueueUploadOperations()
-            }
+        guard let historyToken = notification.userInfo?[NSPersistentHistoryTokenKey] as? NSPersistentHistoryToken else {
+            logger.critical("Could not find Persistent History Token from remote change notification")
+            self.coordinator.handleUnexpectedResponse()
+            return
         }
+        logger.debug("Detected local change \(historyToken)")
+        enqueueUploadOperations()
     }
 
     private func addNewTransactionsToBuffer(since bookmark: Date) {
         // Although history fetcher tries to exclude syncContext transactions, sometimes the fetch request for history items
         // cannot be obtained (for unknown reasons) and so a predicate cannot be appended. So perform the filtering here too.
-        let transactions = historyFetcher.fetch(fromDate: bookmark).filter { $0.contextName != syncContext.name }
+        var transactions = historyFetcher.fetch(fromDate: bookmark)
+        transactions.removeAll { $0.contextName == syncContext.name }
+        if transactions.isEmpty {
+            logger.info("No transactions found")
+        }
 
         localTransactionsPendingPushCompletion.append(contentsOf: transactions)
         if let lastTransaction = transactions.last {
@@ -93,6 +99,11 @@ class UpstreamSyncProcessor {
                     updateBufferBookmarkOperation.cancel()
                     return
                 }
+                guard let transactionNotificationUserInfo = transaction.objectIDNotification().userInfo else {
+                    self.coordinator.handleUnexpectedResponse()
+                    return
+                }
+                NSManagedObjectContext.mergeChanges(fromRemoteContextSave: transactionNotificationUserInfo, into: [self.syncContext])
                 if let changes = transaction.changes {
                     self.attachCKRecords(for: changes, to: uploadOperation)
                 }
@@ -162,47 +173,45 @@ class UpstreamSyncProcessor {
     private func attachCKRecords(for changes: [NSPersistentHistoryChange], to uploadOpertion: CKModifyRecordsOperation) {
         logger.debug("Building CKRecords for local transaction consisting of changes:\n\(changes.description())")
 
-        self.syncContext.performAndWait {
-            // We want to extract the objects corresponding to the changes to that we can determine the entity types,
-            // and then order them according to the orderedTypesToSync property (this will help keep CKReferences intact),
-            // before generating our CKRecords.
-            let changesAndObjects = changes.filter { $0.changeType != .delete }
-                .compactMap { change -> (change: NSPersistentHistoryChange, managedObject: CKRecordRepresentable)? in
-                    guard let managedObject = try? self.syncContext.existingObject(with: change.changedObjectID) as? CKRecordRepresentable else {
-                        return nil
-                    }
-                    return (change, managedObject)
+        // We want to extract the objects corresponding to the changes to that we can determine the entity types,
+        // and then order them according to the orderedTypesToSync property (this will help keep CKReferences intact),
+        // before generating our CKRecords.
+        let changesAndObjects = changes.filter { $0.changeType != .delete }
+            .compactMap { change -> (change: NSPersistentHistoryChange, managedObject: CKRecordRepresentable)? in
+                guard let managedObject = try? self.syncContext.existingObject(with: change.changedObjectID) as? CKRecordRepresentable else {
+                    return nil
                 }
-            let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
-
-            uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity()] }
-                .flatMap { $0 }
-                .compactMap { change, managedObject -> CKRecord? in
-                    let ckKeysToUpload: [String]?
-                    if change.changeType == .update {
-                        guard let coreDataKeys = change.updatedProperties?.map(\.name) else { return nil }
-                        let ckRecordKeys = coreDataKeys.compactMap { managedObject.ckRecordKey(forLocalPropertyKey: $0) }
-                        if ckRecordKeys.isEmpty { return nil }
-                        ckKeysToUpload = ckRecordKeys
-                    } else {
-                        ckKeysToUpload = nil
-                    }
-
-                    return managedObject.buildCKRecord(ckRecordKeys: ckKeysToUpload)
-                }
-
-            uploadOpertion.recordIDsToDelete = changes.filter { $0.changeType == .delete }
-                .compactMap { (change: NSPersistentHistoryChange) -> CKRecord.ID? in
-                    guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
-                    return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
-                }
-
-            if !uploadOpertion.recordsToSave!.isEmpty {
-                logger.debug("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
+                return (change, managedObject)
             }
-            if !uploadOpertion.recordIDsToDelete!.isEmpty {
-                logger.debug("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
+        let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
+
+        uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity()] }
+            .flatMap { $0 }
+            .compactMap { change, managedObject -> CKRecord? in
+                let ckKeysToUpload: [String]?
+                if change.changeType == .update {
+                    guard let coreDataKeys = change.updatedProperties?.map(\.name) else { return nil }
+                    let ckRecordKeys = coreDataKeys.compactMap { managedObject.ckRecordKey(forLocalPropertyKey: $0) }
+                    if ckRecordKeys.isEmpty { return nil }
+                    ckKeysToUpload = ckRecordKeys
+                } else {
+                    ckKeysToUpload = nil
+                }
+
+                return managedObject.buildCKRecord(ckRecordKeys: ckKeysToUpload)
             }
+
+        uploadOpertion.recordIDsToDelete = changes.filter { $0.changeType == .delete }
+            .compactMap { (change: NSPersistentHistoryChange) -> CKRecord.ID? in
+                guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
+                return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
+            }
+
+        if !uploadOpertion.recordsToSave!.isEmpty {
+            logger.debug("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
+        }
+        if !uploadOpertion.recordIDsToDelete!.isEmpty {
+            logger.debug("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
         }
     }
 
