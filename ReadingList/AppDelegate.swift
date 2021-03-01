@@ -50,7 +50,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             orderedTypesToSync: [Book.self, List.self, ListItem.self]
         )
         self.syncCoordinator = syncCoordinator
-        if GeneralSettings.iCloudSyncEnabled {
+        if CloudSyncSettings.settings.syncEnabled {
             syncCoordinator.start()
         }
     }
@@ -58,7 +58,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         launchManager.handleApplicationDidBecomeActive()
 
-        if let syncCoordinator = self.syncCoordinator, GeneralSettings.iCloudSyncEnabled {
+        if let syncCoordinator = self.syncCoordinator, CloudSyncSettings.settings.syncEnabled {
             syncCoordinator.enqueueFetchRemoteChanges()
         }
     }
@@ -85,7 +85,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         logger.info("Application received remote notification")
-        guard GeneralSettings.iCloudSyncEnabled else {
+        guard CloudSyncSettings.settings.syncEnabled else {
             completionHandler(.noData)
             return
         }

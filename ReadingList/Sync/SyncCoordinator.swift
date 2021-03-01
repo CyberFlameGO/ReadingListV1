@@ -109,7 +109,7 @@ final class SyncCoordinator {
 
     func disableSync(reason: SyncDisabledReason) {
         stop()
-        GeneralSettings.iCloudSyncEnabled = false
+        CloudSyncSettings.settings.syncEnabled = false
         disabledReason = reason
     }
 

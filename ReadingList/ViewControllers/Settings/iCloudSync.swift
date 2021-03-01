@@ -15,6 +15,9 @@ class CloudSyncSettings: ObservableObject {
 
     @Persisted("iCloudSyncEnabled", defaultValue: false)
     var syncEnabled: Bool
+
+    @Persisted("hasShownCloudSyncBetaWarning", defaultValue: false)
+    var hasShownBetaWarning: Bool
 }
 
 extension Binding {
@@ -34,6 +37,7 @@ struct CloudSync: View {
     @ObservedObject var settings = CloudSyncSettings.settings
     @State var accountStatus = CKAccountStatus.couldNotDetermine
     @State var syncDisabledReason: SyncDisabledReason?
+    @State var showingCloudSyncBetaWarning = false
 
     func updateAccountStatus() {
         CKContainer.default().accountStatus { status, _ in
@@ -74,6 +78,23 @@ struct CloudSync: View {
         }.onAppear {
             updateAccountStatus()
             syncDisabledReason = AppDelegate.shared.syncCoordinator?.disabledReason
+            if !settings.hasShownBetaWarning {
+                showingCloudSyncBetaWarning = true
+                settings.hasShownBetaWarning = true
+            }
+        }
+        .alert(isPresented: $showingCloudSyncBetaWarning) {
+            Alert(
+                title: Text("iCloud Sync is in Beta"),
+                message: Text("""
+                    Thanks for testing Reading List.
+
+                    iCloud sync is a new feature and it is currently in beta. Please be cautious; before enabling it, \
+                    make a manual CSV backup of your data (under Import & Export). While testing, make regular manual \
+                    CSV backups to keep your data safe.
+                    """),
+                dismissButton: .default(Text("Understood"))
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
             updateAccountStatus()
@@ -90,7 +111,13 @@ struct CloudSyncFooter: View {
 
     var text: String {
         if accountStatus == .available {
-            return "Configure data should be synchronised across all your devices via iCloud."
+            return """
+                Synchronise data across all your devices via iCloud.
+
+                iCloud sync is a new feature and it is currently in beta. Please be cautious; before enabling it, \
+                make a manual CSV backup of your data (under Import & Export). While testing, make regular manual \
+                CSV backups to keep your data safe.
+                """
         } else {
             return "Log in to iCloud to enable iCloud Sync."
         }
@@ -133,7 +160,7 @@ extension SyncDisabledReason: CustomStringConvertible {
         case .outOfDateApp:
             return "Another device is using a more up-to-date version of Reading List. Please update the app via the App Store to resume syncing."
         case .unexpectedResponse:
-            return "An unexpected error occurred during syncing."
+            return "An unexpected error occurred during syncing. Please contact the developer (Settings -> About -> Email Developer) to report this issue."
         case .userAccountChanged:
             return "The iCloud user account on this device was changed. To sync with the current iCloud user, re-enable iCloud Sync above."
         case .cloudDataDeleted:

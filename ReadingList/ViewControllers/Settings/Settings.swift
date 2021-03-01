@@ -57,7 +57,7 @@ struct Settings: View {
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.backgroundRefreshStatusDidChangeNotification)) { _ in
                         badgeOnBackupRow = AutoBackupManager.shared.cannotRunScheduledAutoBackups
                     }
-                SettingsCell(.icloudSync, title: "iCloud Sync", imageName: "icloud.fill", color: .icloudBlue)
+                SettingsCell(.icloudSync, title: "iCloud Sync (Beta)", imageName: "icloud.fill", color: .icloudBlue)
             }
         }.listStyle(GroupedListStyle())
         .navigationBarTitle("Settings")

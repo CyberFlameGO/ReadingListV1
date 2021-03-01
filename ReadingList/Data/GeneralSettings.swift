@@ -18,9 +18,6 @@ struct GeneralSettings {
     @Persisted("addCustomBooksToTopOfCustom", defaultValue: false)
     static var addBooksToTopOfCustom: Bool
 
-    @Persisted("iCloudSyncEnabled", defaultValue: false)
-    static var iCloudSyncEnabled: Bool
-
     @Persisted("showAmazonLinks", defaultValue: true)
     static var showAmazonLinks: Bool
 

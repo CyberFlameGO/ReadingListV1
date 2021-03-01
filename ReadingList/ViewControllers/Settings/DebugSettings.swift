@@ -108,12 +108,12 @@ public struct DebugSettings: View {
                     Section(header: Text("iCloud Sync")) {
                         Button("Simulate remote change notification") {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                if GeneralSettings.iCloudSyncEnabled, let syncCoordinator = AppDelegate.shared.syncCoordinator {
+                                if CloudSyncSettings.settings.syncEnabled, let syncCoordinator = AppDelegate.shared.syncCoordinator {
                                     syncCoordinator.enqueueFetchRemoteChanges()
                                 }
                             }
                         }.disabled(
-                            !GeneralSettings.iCloudSyncEnabled
+                            !CloudSyncSettings.settings.syncEnabled
                         )
                         Button("Delete Remote Zone") {
                             CKContainer.default().privateCloudDatabase.add(CKModifyRecordZonesOperation(recordZonesToSave: nil, recordZoneIDsToDelete: [SyncConstants.zoneID]))
