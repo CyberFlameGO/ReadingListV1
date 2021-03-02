@@ -30,7 +30,7 @@ struct BackupMarkerFileInfo: Codable, Equatable {
         sizeBytes = size
         created = Date()
         deviceName = UIDevice.current.name
-        modelVersion = BooksModelVersion.latest.rawValue
+        modelVersion = BooksModelVersion.latest.modelName
         deviceIdiom = UIDevice.current.userInterfaceIdiom
     }
 

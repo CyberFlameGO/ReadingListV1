@@ -17,11 +17,17 @@ class BookMapping_18_19: NSEntityMigrationPolicy { //swiftlint:disable:this type
         }
     }
 
-    @objc func listItemRemoteIdentifier(forBook book: NSManagedObject, list: NSManagedObject) -> String {
-        guard let bookRemoteIdentifier = book.value(forKey: "remoteIdentifier") as? String else {
+    @objc func listItemRemoteIdentifier(forBook book: NSManagedObject, list: NSManagedObject, manager: NSMigrationManager) -> String {
+        guard let destinationBook = manager.destinationInstances(forEntityMappingName: "BookToBook", sourceInstances: [book]).first else {
+            fatalError("No migrated book found")
+        }
+        guard let bookRemoteIdentifier = destinationBook.value(forKey: "remoteIdentifier") as? String else {
             fatalError("Book had no remoteIdentifier during ListItem migration")
         }
-        guard let listRemoteIdentifier = list.value(forKey: "remoteIdentifier") as? String else {
+        guard let destinationList = manager.destinationInstances(forEntityMappingName: "ListToList", sourceInstances: [list]).first else {
+            fatalError("No migrated list found")
+        }
+        guard let listRemoteIdentifier = destinationList.value(forKey: "remoteIdentifier") as? String else {
             fatalError("List had no remoteIdentifier during ListItem migration")
         }
         return "\(bookRemoteIdentifier)__\(listRemoteIdentifier)"
