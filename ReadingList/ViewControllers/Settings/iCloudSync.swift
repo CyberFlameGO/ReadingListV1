@@ -50,6 +50,7 @@ struct CloudSync: View {
                 footer: CloudSyncFooter(accountStatus: accountStatus, syncDisabledReason: syncDisabledReason)
             ) {
                 Toggle(isOn: settings.$syncEnabled.binding.didSet { isEnabled in
+                    UserEngagement.logEvent(isEnabled ? .enableCloudSync : .disableCloudSync)
                     guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
                         logger.error("SyncCoordinator nil when attempting to enable or disable iCloud sync")
                         return
