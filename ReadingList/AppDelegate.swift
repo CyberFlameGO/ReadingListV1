@@ -43,7 +43,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return !options.any()
     }
 
-    private func initialiseSyncCoordinator() {
+    func initialiseSyncCoordinator() {
         // Initialise the Sync Coordinator which will maintain iCloud synchronisation
         let syncCoordinator = SyncCoordinator(
             persistentContainer: PersistentStoreManager.container,

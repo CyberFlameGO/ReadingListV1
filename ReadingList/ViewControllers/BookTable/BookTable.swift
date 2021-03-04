@@ -53,7 +53,9 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
         }
 
         dataSource = BookTableDiffableDataSource(tableView, controllers: resultsControllers.map(\.controller), sortManager: sortManager,
-                                                 searchController: searchController, onContentChanged: reconfigureNavigationBarAndSectionHeaders)
+                                                 searchController: searchController) { [weak self] in
+            self?.reconfigureNavigationBarAndSectionHeaders()
+        }
 
         // The empty data source manager is in charge of handling and reacting to the empty table state
         let emptyStateMode = BookTableEmptyDataSourceManager.mode(from: readStates)
@@ -128,7 +130,7 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
         let header = tableView.dequeue(BookTableHeader.self)
         header.presenter = self
         header.onSortChanged = { [weak self] in
-            guard let `self` = self else { return }
+            guard let self = self else { return }
 
             // Results controller delegates don't seem to play nicely with changing sort descriptors. So instead, we rebuild the whole
             // set of result controllers, not forgetting to pass the new ones to the data source.
@@ -415,7 +417,7 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
             }
             let confirmDelete = AlertOrMenu(title: nil, items: [
                 AlertOrMenu.Item(title: "Confirm Delete", image: UIImage(systemName: ImageNames.delete), destructive: true) { [weak self] in
-                    guard let `self` = self else { return }
+                    guard let self = self else { return }
                     self.deleteBooks(indexPaths: selectedRows)
                     // Once the deletion has happened, switch editing mode off. Do this on the next run loop to avoid
                     // messing with the row deletion animations

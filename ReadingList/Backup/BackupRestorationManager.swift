@@ -13,6 +13,11 @@ final class BackupRestorationManager {
     /// Switch to the backup restore screen, restore from the provided backup, and then switch back to the app's normal root controller when complete.
     func performRestore(from backup: BackupInfo) {
         guard let window = AppDelegate.shared.window else { fatalError("No window available when attempting to restore") }
+        AppDelegate.shared.syncCoordinator?.stop()
+        AppDelegate.shared.syncCoordinator = nil
+        if #available(iOS 14.0, *) {
+            BookDataSharer.instance.stop()
+        }
         window.rootViewController = BackupRestoreProgress(backupInfo: backup) { result in
             if case let BackupRestoreResult.failure(error) = result {
                 UserEngagement.logError(error)
@@ -20,6 +25,10 @@ final class BackupRestorationManager {
             DispatchQueue.main.async {
                 let newTabBarController = TabBarController()
                 window.rootViewController = newTabBarController
+                AppDelegate.shared.initialiseSyncCoordinator()
+                if #available(iOS 14.0, *) {
+                    BookDataSharer.instance.inititialise(persistentContainer: PersistentStoreManager.container)
+                }
                 switch result {
                 case .cancelled: break
                 case .success:

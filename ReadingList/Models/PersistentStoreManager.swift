@@ -4,7 +4,7 @@ import os.log
 
 class PersistentStoreManager {
 
-    private(set) static var container: NSPersistentContainer!
+    static var container: NSPersistentContainer!
 
     static let storeName = "books"
     static var storeFileName: String { return "\(storeName).sqlite" }

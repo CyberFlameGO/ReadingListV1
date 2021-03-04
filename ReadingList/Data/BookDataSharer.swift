@@ -4,6 +4,7 @@ import WidgetKit
 import ImageIO
 import UIKit
 import os.log
+import Combine
 
 @available(iOS 14.0, *)
 class BookDataSharer {
@@ -11,12 +12,26 @@ class BookDataSharer {
 
     static var instance = BookDataSharer()
     var persistentContainer: NSPersistentContainer!
+    private var cancellables = Set<AnyCancellable>()
 
     func inititialise(persistentContainer: NSPersistentContainer) {
         self.persistentContainer = persistentContainer
-        NotificationCenter.default.addObserver(self, selector: #selector(handleChanges), name: .NSManagedObjectContextDidSave, object: persistentContainer.viewContext)
-        NotificationCenter.default.addObserver(self, selector: #selector(handleChanges), name: .NSManagedObjectContextDidMergeChangesObjectIDs, object: persistentContainer.viewContext)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: persistentContainer.viewContext)
+            .sink { [weak self] _ in
+                self?.handleChanges()
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidMergeChangesObjectIDs, object: persistentContainer.viewContext)
+            .sink { [weak self] _ in
+                self?.handleChanges()
+            }
+            .store(in: &cancellables)
         handleChanges(forceUpdate: false)
+    }
+
+    func stop() {
+        self.persistentContainer = nil
+        cancellables.forEach { $0.cancel() }
     }
 
     private let bookRetrievalCount = 8

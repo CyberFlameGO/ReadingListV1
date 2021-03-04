@@ -47,7 +47,9 @@ final class BookTableDiffableDataSource: EmptyDetectingTableDiffableDataSource<B
         cachedSnapshotsByControllerIdentifier.removeAll(keepingCapacity: true)
 
         for controller in controllers {
-            let snapshotGenerator = ResultsControllerSnapshotGenerator<BookTableDiffableDataSource>(mapSection: self.readState(forSectionName:)) { [unowned self] in
+            let snapshotGenerator = ResultsControllerSnapshotGenerator<BookTableDiffableDataSource>(mapSection: { [unowned self] in
+                self.readState(forSectionName: $0)
+            }) { [unowned self] in
                 guard let currentSnapshot = self.cachedSnapshotsByControllerIdentifier[ObjectIdentifier(controller)] else { preconditionFailure("No cached snapshot available") }
                 return currentSnapshot
             }

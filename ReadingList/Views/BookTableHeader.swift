@@ -58,7 +58,7 @@ class BookTableHeader: UITableViewHeaderFooterView {
             AlertOrMenu.Item(title: sort == selectedSort ? "\(sort.description) ✓" : sort.description) { [weak self] in
                 if selectedSort == sort { return }
                 orderable.setSort(sort)
-                guard let `self` = self else { return }
+                guard let self = self else { return }
                 // Rebuild the menu, so the tick is in the right place next time
                 if #available(iOS 14.0, *) {
                     self.alertOrMenu = self.buildBookSortAlertOrMenu()

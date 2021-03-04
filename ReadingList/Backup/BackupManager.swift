@@ -137,6 +137,7 @@ final class BackupManager {
         var hasReplacedStore = false
         do {
             // Replace the current store with that from our cloud backup
+            PersistentStoreManager.container = nil
             try storeCoordinator.replacePersistentStore(
                 at: PersistentStoreManager.storeLocation,
                 destinationOptions: nil,
