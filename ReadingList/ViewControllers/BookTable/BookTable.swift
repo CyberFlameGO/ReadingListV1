@@ -197,14 +197,14 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
     }
 
     lazy var addButtonAction = AlertOrMenu(title: "Add New Book", items: [
-        AlertOrMenu.Item(title: "Scan Barcode", image: UIImage(systemName: ImageNames.scanBarcode)) {
-            self.present(UIStoryboard.ScanBarcode.rootAsFormSheet(), animated: true, completion: nil)
+        AlertOrMenu.Item(title: "Scan Barcode", image: UIImage(systemName: ImageNames.scanBarcode)) { [weak self] in
+            self?.present(UIStoryboard.ScanBarcode.rootAsFormSheet(), animated: true, completion: nil)
         },
-        AlertOrMenu.Item(title: "Search Online", image: UIImage(systemName: ImageNames.searchOnline)) {
-            self.present(UIStoryboard.SearchOnline.rootAsFormSheet(), animated: true, completion: nil)
+        AlertOrMenu.Item(title: "Search Online", image: UIImage(systemName: ImageNames.searchOnline)) { [weak self] in
+            self?.present(UIStoryboard.SearchOnline.rootAsFormSheet(), animated: true, completion: nil)
         },
-        AlertOrMenu.Item(title: "Add Manually", image: UIImage(systemName: ImageNames.addBookManually)) {
-            self.present(EditBookMetadata(bookToCreateReadState: .toRead).inNavigationController(), animated: true, completion: nil)
+        AlertOrMenu.Item(title: "Add Manually", image: UIImage(systemName: ImageNames.addBookManually)) { [weak self] in
+            self?.present(EditBookMetadata(bookToCreateReadState: .toRead).inNavigationController(), animated: true, completion: nil)
         }
     ])
 
@@ -405,14 +405,14 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
             guard let selectedRows = self.tableView.indexPathsForSelectedRows, !selectedRows.isEmpty else { return [] }
             let selectedReadStates = selectedRows.map { self.dataSource.readState(forSection: $0.section) }.distinct()
 
-            var items = [AlertOrMenu.Item(title: "Manage Lists", image: UIImage(systemName: ImageNames.manageLists)) {
-                self.presentManageSelectedBooksLists()
+            var items = [AlertOrMenu.Item(title: "Manage Lists", image: UIImage(systemName: ImageNames.manageLists)) { [weak self] in
+                self?.presentManageSelectedBooksLists()
             }]
             if let initialSelectionReadState = selectedReadStates.first, initialSelectionReadState != .finished, selectedReadStates.count == 1 {
                 let title = initialSelectionReadState == .toRead ? "Start Selected" : "Finish Selected"
                 let image = UIImage(systemName: initialSelectionReadState == .toRead ? ImageNames.startBookPlay : ImageNames.finishBookCheckmark)
-                items.append(AlertOrMenu.Item(title: title, image: image) {
-                    self.startOrFinishSelectedBooks(shouldStart: initialSelectionReadState == .toRead)
+                items.append(AlertOrMenu.Item(title: title, image: image) { [weak self] in
+                    self?.startOrFinishSelectedBooks(shouldStart: initialSelectionReadState == .toRead)
                 })
             }
             let confirmDelete = AlertOrMenu(title: nil, items: [
@@ -427,8 +427,9 @@ final class BookTable: UITableViewController { //swiftlint:disable:this type_bod
                 }
             ])
             items.append(AlertOrMenu.Item(title: "Delete Selected", image: UIImage(systemName: ImageNames.delete), destructive: true, childAlertOrMenu: confirmDelete) { [weak self] secondaryAlert in
-                secondaryAlert.popoverPresentationController?.barButtonItem = self?.navigationItem.rightBarButtonItem
-                self?.present(secondaryAlert, animated: true)
+                guard let self = self else { return }
+                secondaryAlert.popoverPresentationController?.barButtonItem = self.navigationItem.rightBarButtonItem
+                self.present(secondaryAlert, animated: true)
             })
             return items
         }

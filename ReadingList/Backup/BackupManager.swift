@@ -159,7 +159,7 @@ final class BackupManager {
             }
         } catch {
             logger.error("Error while restoring from backup: \(error.localizedDescription)")
-            let restorationFailure: RestorationFailure = hasReplacedStore ? .initialisationFailure(error) : .replaceStoreFailure(error)
+            var failure: RestorationFailure = hasReplacedStore ? .initialisationFailure(error) : .replaceStoreFailure(error)
             // If we failed during the replacement of the store, then let's try to put the backup back in place, using the current (latest) managed object model.
             let restorationStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: BooksModelVersion.latest.managedObjectModel())
             do {
@@ -170,15 +170,6 @@ final class BackupManager {
                     sourceOptions: nil,
                     ofType: NSSQLiteStoreType
                 )
-
-                try PersistentStoreManager.initalisePersistentStore {
-                    // Clear out temporary files - the current-store backup, and the backup unzip directory
-                    try? FileManager.default.removeItem(at: currentStoreBackupDir)
-                    try? FileManager.default.removeItem(at: backupDataArchiveUnzipped)
-
-                    // Remember that this does not represent success - we have succeeded in putting the backup back, but failed overall.
-                    completion(restorationFailure)
-                }
             } catch {
                 // This is a serious failure, and it's not clear what this means. The existing store may be OK, or it may be broken.
                 // We can try to hope that the app remains functional.
@@ -188,7 +179,16 @@ final class BackupManager {
                 try? FileManager.default.removeItem(at: currentStoreBackupDir)
                 try? FileManager.default.removeItem(at: backupDataArchiveUnzipped)
 
-                completion(.errorRecoveryFailure(restorationFailure))
+                failure = .errorRecoveryFailure(failure)
+            }
+
+            try! PersistentStoreManager.initalisePersistentStore {
+                // Clear out temporary files - the current-store backup, and the backup unzip directory
+                try? FileManager.default.removeItem(at: currentStoreBackupDir)
+                try? FileManager.default.removeItem(at: backupDataArchiveUnzipped)
+
+                // Remember that this does not represent success - we have succeeded in putting the backup back, but failed overall.
+                completion(failure)
             }
         }
     }
