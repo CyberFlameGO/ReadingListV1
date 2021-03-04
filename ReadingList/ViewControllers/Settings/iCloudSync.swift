@@ -4,7 +4,7 @@ import CloudKit
 import SwiftUI
 import PersistedPropertyWrapper
 
-class CloudSyncSettings: ObservableObject {
+class CloudSyncSettings {
     private init() { }
 
     static var settings = CloudSyncSettings()
@@ -14,6 +14,10 @@ class CloudSyncSettings: ObservableObject {
 
     @Persisted("hasShownCloudSyncBetaWarning", defaultValue: false)
     var hasShownBetaWarning: Bool
+}
+
+class CloudSyncUISettings: ObservableObject {
+    @Published var syncEnabled = CloudSyncSettings.settings.syncEnabled
 }
 
 extension Binding {
@@ -30,7 +34,7 @@ extension Binding {
 
 struct CloudSync: View {
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
-    @ObservedObject var settings = CloudSyncSettings.settings
+    @ObservedObject var settings = CloudSyncUISettings()
     @State var accountStatus = CKAccountStatus.couldNotDetermine
     @State var syncDisabledReason: SyncDisabledReason?
     @State var showingCloudSyncBetaWarning = false
@@ -43,25 +47,33 @@ struct CloudSync: View {
         }
     }
 
+    var syncEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settings.syncEnabled },
+            set: { isEnabled in
+                UserEngagement.logEvent(isEnabled ? .enableCloudSync : .disableCloudSync)
+                guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
+                    logger.error("SyncCoordinator nil when attempting to enable or disable iCloud sync")
+                    return
+                }
+                if isEnabled {
+                    syncDisabledReason = nil
+                    syncCoordinator.start()
+                } else {
+                    syncCoordinator.stop()
+                }
+                settings.syncEnabled = isEnabled
+            }
+        )
+    }
+
     var body: some View {
         SwiftUI.List {
             Section(
                 header: HeaderText("Sync", inset: hostingSplitView.isSplit),
                 footer: CloudSyncFooter(accountStatus: accountStatus, syncDisabledReason: syncDisabledReason)
             ) {
-                Toggle(isOn: settings.$syncEnabled.binding.didSet { isEnabled in
-                    UserEngagement.logEvent(isEnabled ? .enableCloudSync : .disableCloudSync)
-                    guard let syncCoordinator = AppDelegate.shared.syncCoordinator else {
-                        logger.error("SyncCoordinator nil when attempting to enable or disable iCloud sync")
-                        return
-                    }
-                    if isEnabled {
-                        syncDisabledReason = nil
-                        syncCoordinator.start()
-                    } else {
-                        syncCoordinator.stop()
-                    }
-                }) {
+                Toggle(isOn: syncEnabledBinding) {
                     Text("Enable iCloud Sync")
                 }.disabled(accountStatus != .available)
             }
@@ -75,9 +87,9 @@ struct CloudSync: View {
         }.onAppear {
             updateAccountStatus()
             syncDisabledReason = AppDelegate.shared.syncCoordinator?.disabledReason
-            if !settings.hasShownBetaWarning {
+            if !CloudSyncSettings.settings.hasShownBetaWarning {
                 showingCloudSyncBetaWarning = true
-                settings.hasShownBetaWarning = true
+                CloudSyncSettings.settings.hasShownBetaWarning = true
             }
         }
         .alert(isPresented: $showingCloudSyncBetaWarning) {
