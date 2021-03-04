@@ -1,20 +1,6 @@
 import Foundation
 import SwiftUI
 
-struct SafariViewPresenterWrapper<Wrapped>: View where Wrapped: View {
-    let wrapped: Wrapped
-    let url: URL
-    @State var presenting = false
-
-    var body: some View {
-        wrapped
-            .safariView(isPresented: $presenting) {
-                SafariView(url: url)
-            }
-            .onTapGesture { presenting.toggle() }
-    }
-}
-
 struct SafariPresentingButton<ButtonLabel>: View where ButtonLabel: View {
     let url: URL
     let buttonLabel: ButtonLabel
@@ -38,9 +24,10 @@ struct SafariPresentingButton<ButtonLabel>: View where ButtonLabel: View {
         Button(action: {
             buttonAction?()
             presenting.toggle()
-        }, label: {
+        }) {
             buttonLabel
-        }).safariView(isPresented: $presenting) {
+        }.buttonStyle(PlainButtonStyle())
+        .safariView(isPresented: $presenting) {
             SafariView(url: url)
         }
     }
@@ -48,6 +35,8 @@ struct SafariPresentingButton<ButtonLabel>: View where ButtonLabel: View {
 
 extension View {
     func presentingSafari(_ url: URL) -> some View {
-        return SafariViewPresenterWrapper(wrapped: self, url: url)
+        return SafariPresentingButton(url) {
+            self
+        }
     }
 }

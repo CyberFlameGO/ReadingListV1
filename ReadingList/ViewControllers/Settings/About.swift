@@ -36,10 +36,7 @@ struct About: View {
 
                 IconCell("Email Developer",
                          imageName: "envelope.fill",
-                         backgroundColor: .paleEmailBlue
-                ).onAppear {
-                    gatherLogFile()
-                }.onTapGesture {
+                         backgroundColor: .paleEmailBlue) {
                     if #available(iOS 14.0, *) {
                         isShowingMailAlert = true
                     } else {
@@ -51,6 +48,9 @@ struct About: View {
                             isShowingLegacyMailAlert = true
                         }
                     }
+                }
+                .onAppear {
+                    gatherLogFile()
                 }.actionSheet(isPresented: $isShowingMailAlert) {
                     mailAlert
                 }.sheet(isPresented: $isShowingMailView) {
@@ -59,12 +59,15 @@ struct About: View {
                     legacyMailAlert
                 }
 
-                IconCell("Attributions",
-                         imageName: "heart.fill",
-                         backgroundColor: .green
-                         // Re-provide the environment object, otherwise we seem to get trouble
-                         // when the containing hosting VC gets removed from the window
-                ).navigating(to: Attributions().environmentObject(hostingSplitView))
+                IconCellBody(
+                    text: "Attributions",
+                    imageName: "heart.fill",
+                    backgroundColor: .green
+                ).navigating(
+                    // Re-provide the environment object, otherwise we seem to get trouble
+                    // when the containing hosting VC gets removed from the window
+                    to: Attributions().environmentObject(hostingSplitView)
+                )
 
                 IconCell("Privacy Policy",
                          imageName: "lock.fill",
@@ -179,7 +182,7 @@ struct AboutHeader: View {
     var innerBody: some View {
         (Text("Reading List ").bold() +
         Text("""
-            is developed by single developer – me, Andrew 👋 I hope you are enjoying using the app 😊
+            is developed by a single developer – me, Andrew 👋 I hope you are enjoying using the app 😊
 
             If you value the app, please consider leaving a review, tweeting about it, sharing, or leaving a tip.
 
@@ -220,6 +223,8 @@ struct AboutFooter: View {
         .font(.caption)
         .foregroundColor(Color(.label))
         .padding(.top, 10)
+        .accessibilityElement(children: .ignore)
+        .accessibility(label: Text("Version \(BuildInfo.thisBuild.version.description). Build \(buildNumber). Copyright Andrew Bennet, 2021."))
     }
 }
 

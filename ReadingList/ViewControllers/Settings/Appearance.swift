@@ -57,12 +57,12 @@ struct Appearance: View {
                 }
                 if let darkModeOverride = settings.darkModeOverride {
                     CheckmarkCellRow("Light Appearance", checkmark: !darkModeOverride)
-                        .onTapGesture {
+                        .withButtonAction {
                             settings.darkModeOverride = false
                             updateWindowInterfaceStyle()
                         }
                     CheckmarkCellRow("Dark Appearance", checkmark: darkModeOverride)
-                        .onTapGesture {
+                        .withButtonAction {
                             settings.darkModeOverride = true
                             updateWindowInterfaceStyle()
                         }
@@ -101,6 +101,7 @@ struct CheckmarkCellRow: View {
                 Image(systemName: "checkmark").foregroundColor(Color(.systemBlue))
             }
         }.contentShape(Rectangle())
+        .accessibility(label: Text(checkmark ? "Selected: \(text)" : text))
     }
 }
 

@@ -7,10 +7,10 @@ struct ModalPresenter<Wrapped, Modal>: View where Wrapped: View, Modal: View {
     var modal: Modal
 
     var body: some View {
-        return wrapped.sheet(isPresented: $isPresented) {
-            modal
-        }.onTapGesture {
+        wrapped.withButtonAction {
             isPresented.toggle()
+        }.sheet(isPresented: $isPresented) {
+            modal
         }
     }
 }

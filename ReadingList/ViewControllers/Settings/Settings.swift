@@ -35,11 +35,9 @@ struct Settings: View {
             Section(header: header) {
 
                 SettingsCell(.about, title: "About", imageName: "info", color: .blue)
-                IconCell("Rate", imageName: "star.fill", backgroundColor: .orange)
-                    .onTapGesture {
-                        UIApplication.shared.open(writeReviewUrl, options: [:])
-                    }
-                    .foregroundColor(Color(.label))
+                IconCell("Rate", imageName: "star.fill", backgroundColor: .orange) {
+                    UIApplication.shared.open(writeReviewUrl, options: [:])
+                }.foregroundColor(Color(.label))
                 SettingsCell(.tip, title: "Leave Tip", imageName: "heart.fill", color: .pink)
             }
             Section {
@@ -117,7 +115,7 @@ struct SettingsHeader: View {
                     #else
                     EmptyView()
                     #endif
-                }
+                }.accessibility(label: Text("Reading List app icon"))
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center) {
                     Text("Reading List")
@@ -127,7 +125,8 @@ struct SettingsHeader: View {
                 }.foregroundColor(Color(.label))
                 Text("by Andrew Bennet")
                     .font(.footnote)
-            }
+            }.accessibilityElement(children: .ignore)
+            .accessibility(label: Text("Reading List version \(version) by Andrew Bennet"))
         }.onReceive(NotificationCenter.default.publisher(for: .appIconChanged)) { _ in
             iconName = UIApplication.shared.alternateIconName
         }
@@ -182,8 +181,7 @@ struct SettingsCell<T>: View where T: View {
             withChevron: !hostingSplitView.isSplit,
             withBadge: badge ? "1" : nil,
             textForegroundColor: cellLabelColor
-        )
-        .onTapGesture {
+        ) {
             hostingSplitView.selectedCell = cell
         }
         .listRowBackground(cellBackground.edgesIgnoringSafeArea([.horizontal]))

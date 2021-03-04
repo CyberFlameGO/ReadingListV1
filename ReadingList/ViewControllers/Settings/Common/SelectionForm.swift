@@ -15,7 +15,7 @@ struct SelectionForm<Selection>: View where Selection: CustomStringConvertible, 
                         Image(systemName: "checkmark").foregroundColor(Color(.systemBlue))
                     }
                 }.contentShape(Rectangle())
-                .onTapGesture {
+                .withButtonAction {
                     selectedOption = option
                 }
             }

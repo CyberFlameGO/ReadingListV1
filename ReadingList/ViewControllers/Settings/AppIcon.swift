@@ -23,6 +23,9 @@ struct AppIconCellRow: View {
     let alternateIconName: String?
     let name: String
     @Binding var selectedIconName: String?
+    var isSelected: Bool {
+        selectedIconName == alternateIconName
+    }
 
     var body: some View {
         HStack {
@@ -33,11 +36,11 @@ struct AppIconCellRow: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.lightGray)))
             Text(name)
             Spacer()
-            if selectedIconName == alternateIconName {
+            if isSelected {
                 Image(systemName: "checkmark").foregroundColor(Color(.systemBlue))
             }
         }.contentShape(Rectangle())
-        .onTapGesture {
+        .withButtonAction {
             UIApplication.shared.setAlternateIconName(alternateIconName) { error in
                 if let error = error {
                     UserEngagement.logError(error)
@@ -46,6 +49,6 @@ struct AppIconCellRow: View {
                     NotificationCenter.default.post(name: .appIconChanged, object: nil)
                 }
             }
-        }
+        }.accessibility(label: isSelected ? Text("Selected: \(name)") : Text(name))
     }
 }
