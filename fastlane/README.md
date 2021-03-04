@@ -16,11 +16,16 @@ or alternatively using `brew install fastlane`
 
 # Available Actions
 ## iOS
+### ios deploy
+```
+fastlane ios deploy
+```
+
 ### ios preprocess
 ```
 fastlane ios preprocess
 ```
-Configures Fabric, builds the project file and sets the build number from git.
+Builds the project file and sets the build number from git.
 ### ios ci
 ```
 fastlane ios ci
