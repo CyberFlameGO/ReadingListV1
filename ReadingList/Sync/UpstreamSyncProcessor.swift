@@ -11,24 +11,24 @@ class UpstreamSyncProcessor {
     let syncContext: NSManagedObjectContext
     let orderedTypesToSync: [CKRecordRepresentable.Type]
     var localTransactionsPendingPushCompletion = [NSPersistentHistoryTransaction]()
+    private let historyFetcher: PersistentHistoryFetcher
 
     init(container: NSPersistentContainer, syncContext: NSManagedObjectContext, cloudOperationQueue: ConcurrentCKQueue, types: [CKRecordRepresentable.Type]) {
         self.container = container
         self.syncContext = syncContext
         self.cloudOperationQueue = cloudOperationQueue
         self.orderedTypesToSync = types
+        self.historyFetcher = PersistentHistoryFetcher(context: container.newBackgroundContext(), excludeHistoryFromContextWithName: syncContext.name!)
     }
 
     @Persisted("SyncEngine_LocalChangeTimestamp")
     private(set) var latestConfirmedUploadedTransaction: Date?
 
     private var bufferBookmark: Date?
-    private var historyFetcher: PersistentHistoryFetcher!
     private var cancellables = Set<AnyCancellable>()
 
     func start() {
         self.syncContext.refreshAllObjects()
-        historyFetcher = PersistentHistoryFetcher(context: self.container.newBackgroundContext(), excludeHistoryFromContextWithName: syncContext.name!)
         NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: container.persistentStoreCoordinator)
             .sink(receiveValue: handleLocalChangeNotification)
             .store(in: &cancellables)
