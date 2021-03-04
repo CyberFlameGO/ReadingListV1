@@ -57,6 +57,8 @@ struct About: View {
                     emailSheet
                 }.alert(isPresented: $isShowingLegacyMailAlert) {
                     legacyMailAlert
+                }.safariView(isPresented: $isShowingFaq) {
+                    SafariView(url: URL(string: "https://readinglist.app/faqs/")!)
                 }
 
                 IconCellBody(
