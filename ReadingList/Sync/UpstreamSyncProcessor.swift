@@ -254,7 +254,7 @@ class UpstreamSyncProcessor {
         if ckError.code == .limitExceeded {
             // TODO: Implement!
             logger.error("CloudKit batch limit exceeded, sending records in chunks")
-            fatalError("Not implemented: batch uploads. Here we should divide the records in chunks and upload in batches instead of trying everything at once.")
+            self.coordinator.handleUnexpectedResponse()
         } else if ckError.code == .operationCancelled {
             return
         } else if ckError.code == .partialFailure {
