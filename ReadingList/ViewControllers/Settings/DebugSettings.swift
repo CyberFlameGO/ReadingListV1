@@ -1,6 +1,8 @@
 #if DEBUG
 import SwiftUI
 import SVProgressHUD
+import CloudKit
+import CocoaLumberjackSwift
 
 public struct DebugSettings: View {
 
@@ -58,6 +60,9 @@ public struct DebugSettings: View {
                         ActivityViewController(activityItems: [finishedBookDataFile!])
                     }
                 }
+                Section(header: Text("Logs")) {
+                    NavigationLink("Log Files", destination: LogFiles())
+                }
                 Section(header: Text("Debug Controls")) {
                     Toggle(isOn: showSortNumber) {
                         Text("Show sort number")
@@ -100,10 +105,113 @@ public struct DebugSettings: View {
                         fatalError("Test Crash")
                     }.foregroundColor(.red)
                 }
+                    Section(header: Text("iCloud Sync")) {
+                        Button("Simulate remote change notification") {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                if CloudSyncSettings.settings.syncEnabled, let syncCoordinator = AppDelegate.shared.syncCoordinator {
+                                    syncCoordinator.enqueueFetchRemoteChanges()
+                                }
+                            }
+                        }.disabled(
+                            !CloudSyncSettings.settings.syncEnabled
+                        )
+                        Button("Delete Remote Zone") {
+                            CKContainer.default().privateCloudDatabase.add(CKModifyRecordZonesOperation(recordZonesToSave: nil, recordZoneIDsToDelete: [SyncConstants.zoneID]))
+                        }.foregroundColor(Color(.systemRed))
+                    }
             }.navigationBarTitle("Debug Settings", displayMode: .inline)
             .navigationBarItems(trailing: Button("Dismiss") {
                 isPresented = false
             })
+        }
+    }
+}
+
+struct LogFiles: View {
+    @State var filePaths = [URL]()
+    @State var fileSizes = [URL: Int64]()
+    static let sizeFormatter = ByteCountFormatter()
+
+    var body: some View {
+        SwiftUI.List {
+            ForEach(filePaths, id: \.self) { path in
+                NavigationLink(destination: LogFile(url: path)) {
+                    HStack {
+                        Text(path.lastPathComponent)
+                        Spacer()
+                        if let fileSize = fileSizes[path] {
+                            Text(Self.sizeFormatter.string(fromByteCount: fileSize))
+                        }
+                    }
+                }
+            }.onDelete { indexSet in
+                for index in indexSet {
+                    try? FileManager.default.removeItem(at: filePaths[index])
+                }
+            }
+        }.onAppear {
+            loadFilePaths()
+        }
+    }
+
+    func loadFilePaths() {
+        guard let fileLogger = DDLog.allLoggers.compactMap({
+            $0 as? DDFileLogger
+        }).first else { fatalError("No file logger found") }
+        filePaths = fileLogger.logFileManager.sortedLogFilePaths.map { URL(fileURLWithPath: $0) }
+        for file in filePaths {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path) else {
+                continue
+            }
+            guard let size = attributes[.size] as? Int64 else { continue }
+            fileSizes[file] = size
+        }
+    }
+}
+
+struct LogFile: View {
+    let url: URL
+    @State private var fileContents: String?
+    @State var shareLogFileSheetIsPresented = false
+
+    var body: some View {
+        Group {
+            if let fileContents = fileContents {
+                if #available(iOS 14.0, *) {
+                    ScrollingFileContents(fileContents: fileContents)
+                        .sheet(isPresented: $shareLogFileSheetIsPresented) {
+                            ActivityViewController(activityItems: [fileContents])
+                        }
+                        .toolbar {
+                            Button(action: {
+                                shareLogFileSheetIsPresented = true
+                            }, label: {
+                                Image(systemName: "square.and.arrow.up")
+                            })
+                        }
+                } else {
+                    ScrollingFileContents(fileContents: fileContents)
+                }
+            } else {
+                ProgressSpinnerView(isAnimating: .constant(true), style: .medium)
+            }
+        }.onAppear {
+            guard let fileContents = try? String(contentsOf: url) else {
+                fatalError("Could not open file")
+            }
+            self.fileContents = fileContents
+        }
+
+    }
+}
+struct ScrollingFileContents: View {
+    let fileContents: String
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            Text(fileContents)
+                .font(.system(.caption, design: .monospaced))
+                .multilineTextAlignment(.leading)
         }
     }
 }

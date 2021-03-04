@@ -7,6 +7,7 @@ class List: NSManagedObject {
     @NSManaged var name: String
     @NSManaged var order: BookSort
     @NSManaged var sort: Int32
+    @NSManaged var remoteIdentifier: String
     @NSManaged private(set) var custom: Bool
 
     /** The item which hold a book-index pair for each book in this list */
@@ -14,7 +15,7 @@ class List: NSManagedObject {
 
     /** The ordered array of books within this list. If just a count is required, use items.count instead. */
     var books: [Book] {
-        items.sorted(byAscending: \.sort).map(\.book)
+        items.sorted(byAscending: \.sort).compactMap(\.book)
     }
 
     convenience init(context: NSManagedObjectContext, name: String) {
@@ -25,6 +26,10 @@ class List: NSManagedObject {
         }
     }
 
+    func setRemoteIdentifier() {
+        remoteIdentifier = UUID().uuidString
+    }
+
     func removeBook(_ book: Book) {
         for item in items where item.book == book {
             item.delete()
@@ -32,8 +37,10 @@ class List: NSManagedObject {
     }
 
     func removeBooks(_ books: Set<Book>) {
-        for item in items where books.contains(item.book) {
-            item.delete()
+        for item in items {
+            if let book = item.book, books.contains(book) {
+                item.delete()
+            }
         }
     }
 
@@ -71,14 +78,11 @@ class List: NSManagedObject {
         return context.getMaximum(sortValueKeyPath: \List.sort)
     }
 
-    class func getOrCreate(inContext context: NSManagedObjectContext, withName name: String) -> List {
+    class func get(inContext context: NSManagedObjectContext, withName name: String) -> List? {
         let listFetchRequest = NSManagedObject.fetchRequest(List.self, limit: 1)
         listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(Subject.name), name)
         listFetchRequest.returnsObjectsAsFaults = false
-        if let existingList = (try! context.fetch(listFetchRequest)).first {
-            return existingList
-        }
-        return List(context: context, name: name)
+        return (try! context.fetch(listFetchRequest)).first
     }
 }
 

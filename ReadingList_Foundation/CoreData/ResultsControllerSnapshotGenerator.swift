@@ -131,6 +131,7 @@ public final class ResultsControllerSnapshotGenerator<Delegate>: ResultsControll
         guard let sectionChangeCollection = CollectionDifference(sectionChanges) else {
             preconditionFailure("Unable to create a collection difference from the changes \(itemChangesBySection)")
         }
+
         for change in sectionChangeCollection {
             changeProcessingSnapshot.loadSectionChanges(change)
         }

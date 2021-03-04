@@ -49,7 +49,7 @@ struct General: View {
         SwiftUI.List {
             Section(
                 header: HeaderText("Sort Options", inset: hostingSplitView.isSplit),
-                footer: FooterText("""
+                footer: Footer("""
                     Configure whether newly added books get added to the top or the bottom of the \
                     reading list when Custom ordering is used.
                     """, inset: hostingSplitView.isSplit
@@ -61,7 +61,7 @@ struct General: View {
             }
             Section(
                 header: HeaderText("Progress", inset: inset),
-                footer: FooterText("Choose whether to default to Page Number or Percentage when setting progress.", inset: inset)
+                footer: Footer("Choose whether to default to Page Number or Percentage when setting progress.", inset: inset)
             ) {
                 NavigationLink(
                     destination: SelectionForm<ProgressType>(
@@ -80,7 +80,7 @@ struct General: View {
 
             Section(
                 header: HeaderText("Language", inset: inset),
-                footer: FooterText("""
+                footer: Footer("""
                     By default, Reading List prioritises search results based on their language and your location. To instead \
                     restrict search results to be of a specific language only, select a language above.
                     """, inset: inset)

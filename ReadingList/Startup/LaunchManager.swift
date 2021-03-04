@@ -3,7 +3,11 @@ import SwiftyStoreKit
 import SVProgressHUD
 import os.log
 import CoreData
+import Reachability
 import PersistedPropertyWrapper
+import CocoaLumberjackSwift
+import CocoaLumberjackSwiftLogBackend
+import Logging
 
 class LaunchManager {
 
@@ -21,9 +25,12 @@ class LaunchManager {
     */
     func initialise() {
         isFirstLaunch = AppLaunchHistory.appOpenedCount == 0
+
         #if DEBUG
         Debug.initialiseSettings()
         #endif
+
+        initialiseLogging()
         UserEngagement.initialiseUserAnalytics()
         SVProgressHUD.setDefaults()
         SwiftyStoreKit.completeTransactions()
@@ -32,6 +39,25 @@ class LaunchManager {
             AutoBackupManager.shared.registerBackgroundTasks()
             AutoBackupManager.shared.scheduleBackup()
         }
+    }
+
+    private func initialiseLogging() {
+        let fileLogger = DDFileLogger()
+        fileLogger.rollingFrequency = 60 * 60 * 24
+        fileLogger.logFileManager.maximumNumberOfLogFiles = 7
+        DDLog.add(fileLogger)
+        DDLog.add(DDOSLogger())
+
+        let logLevel: Logging.Logger.Level
+        switch BuildInfo.thisBuild.type {
+        case .debug:
+            logLevel = .trace
+        case .testFlight:
+            logLevel = .debug
+        case .appStore:
+            logLevel = .info
+        }
+        LoggingSystem.bootstrapWithCocoaLumberjack(for: DDLog.sharedInstance, defaultLogLevel: logLevel, loggingSynchronousAsOf: .error)
     }
 
     func handleApplicationDidBecomeActive() {
@@ -58,25 +84,22 @@ class LaunchManager {
     }
 
     /**
-     Initialises the persistent store on a background thread. If successfully completed, the main thread
-     will instantiate the root view controller, perform some other app-startup work. If the persistent store
-     fails to initialise, then an error alert is presented to the user.
+     Initialises the persistent store on a background thread. If successfully completed, the callback will be run
+     on the main thread. If the persistent store fails to initialise, then an error alert is presented to the user.
      */
-    func initialisePersistentStore(_ options: LaunchOptions? = nil) {
+    func initialisePersistentStore(_ onSuccess: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInteractive).async {
             do {
                 try PersistentStoreManager.initalisePersistentStore {
                     os_log("Persistent store loaded", type: .info)
                     DispatchQueue.main.async {
                         self.initialiseAfterPersistentStoreLoad()
-                        if let options = options {
-                            self.handleLaunchOptions(options)
-                        }
-                    }
+                        onSuccess()
 
-                    // Notify any other parts of the app which may be waiting on an initialised persistent container (specifically,
-                    // background backup tasks).
-                    NotificationCenter.default.post(name: .didCompletePersistentStoreInitialisation, object: nil)
+                        // Notify any other parts of the app which may be waiting on an initialised persistent container (specifically,
+                        // background backup tasks).
+                        NotificationCenter.default.post(name: .didCompletePersistentStoreInitialisation, object: nil)
+                    }
                 }
             } catch MigrationError.incompatibleStore {
                 DispatchQueue.main.async {
@@ -90,7 +113,7 @@ class LaunchManager {
         }
     }
 
-    private func handleLaunchOptions(_ options: LaunchOptions) {
+    func handleLaunchOptions(_ options: LaunchOptions) {
         guard let window = window else { return }
         guard let tabBarController = window.rootViewController as? TabBarController else {
             assertionFailure()
@@ -150,7 +173,7 @@ class LaunchManager {
         #endif
     }
 
-    private func initialiseAfterPersistentStoreLoad() {
+    func initialiseAfterPersistentStoreLoad() {
         #if DEBUG
         Debug.initialiseData()
         #endif
@@ -219,7 +242,12 @@ class LaunchManager {
         #if DEBUG
         alert.addAction(UIAlertAction(title: "Delete Store", style: .destructive) { _ in
             NSPersistentStoreCoordinator().destroyAndDeleteStore(at: URL.applicationSupport.appendingPathComponent(PersistentStoreManager.storeFileName))
-            self.initialisePersistentStore()
+            // More accurately model a reinstall by clearing UserDefaults too
+            UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
+            UserDefaults.standard.synchronize()
+            self.initialisePersistentStore {
+                self.initialiseAfterPersistentStoreLoad()
+            }
             self.storeMigrationFailed = false
         })
         #endif

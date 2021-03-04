@@ -3,12 +3,16 @@ import UIKit
 import WhatsNewKit
 import SafariServices
 import MessageUI
+import ZIPFoundation
+import CocoaLumberjackSwift
 
 struct About: View {
     let changeListProvider = ChangeListProvider()
     @State var isShowingMailAlert = false
     @State var isShowingMailView = false
+    @State var isShowingLegacyMailAlert = false
     @State var isShowingFaq = false
+    @State var emailAttachments: [MailView.Attachment]?
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
 
     var body: some View {
@@ -33,18 +37,26 @@ struct About: View {
                 IconCell("Email Developer",
                          imageName: "envelope.fill",
                          backgroundColor: .paleEmailBlue
-                ).onTapGesture {
+                ).onAppear {
+                    gatherLogFile()
+                }.onTapGesture {
                     if #available(iOS 14.0, *) {
                         isShowingMailAlert = true
                     } else {
                         // Action sheet anchors are messed up on iOS 13;
                         // go straight to the Email view, skipping the sheet
-                        isShowingMailView = true
+                        if MFMailComposeViewController.canSendMail() {
+                            isShowingMailView = true
+                        } else {
+                            isShowingLegacyMailAlert = true
+                        }
                     }
                 }.actionSheet(isPresented: $isShowingMailAlert) {
                     mailAlert
                 }.sheet(isPresented: $isShowingMailView) {
-                    mailView
+                    emailSheet
+                }.alert(isPresented: $isShowingLegacyMailAlert) {
+                    legacyMailAlert
                 }
 
                 IconCell("Attributions",
@@ -53,7 +65,7 @@ struct About: View {
                          // Re-provide the environment object, otherwise we seem to get trouble
                          // when the containing hosting VC gets removed from the window
                 ).navigating(to: Attributions().environmentObject(hostingSplitView))
-                
+
                 IconCell("Privacy Policy",
                          imageName: "lock.fill",
                          backgroundColor: Color(.darkGray)
@@ -70,6 +82,41 @@ struct About: View {
         }
         .possiblyInsetGroupedListStyle(inset: hostingSplitView.isSplit)
         .navigationBarTitle("About")
+    }
+
+    func gatherLogFile() {
+        DispatchQueue.global(qos: .userInteractive).async {
+            guard let fileLogger = DDLog.allLoggers.compactMap({
+                $0 as? DDFileLogger
+            }).first else { fatalError("No file logger found") }
+
+            var emailAttachmentData: Data?
+            if let logFilePath = fileLogger.logFileManager.sortedLogFilePaths.first {
+                let logFileURL = URL(fileURLWithPath: logFilePath)
+                do {
+                    try emailAttachmentData = Data(contentsOf: logFileURL)
+                } catch {
+                    logger.error("Error getting log file data for email: \(error.localizedDescription)")
+                }
+            }
+
+            if let emailAttachmentData = emailAttachmentData {
+                emailAttachments = [MailView.Attachment(data: emailAttachmentData, mimeType: "text/plain", fileName: "ReadingList_Logs.txt")]
+            } else {
+                emailAttachments = nil
+            }
+        }
+    }
+
+    var legacyMailAlert: Alert {
+        Alert(
+            title: Text("Copy Email Address?"),
+            message: Text("To suggest features or report bugs, please email feedback@readinglist.app"),
+            primaryButton: .default(Text("Copy Email Address")) {
+                UIPasteboard.general.string = "feedback@readinglist.app"
+            },
+            secondaryButton: .cancel()
+        )
     }
 
     var mailAlert: ActionSheet {
@@ -105,7 +152,7 @@ struct About: View {
         )
     }
 
-    var mailView: MailView {
+    var emailSheet: some View {
         MailView(
             isShowing: $isShowingMailView,
             receipients: [
@@ -122,7 +169,8 @@ struct About: View {
             iOS Version: \(UIDevice.current.systemVersion)
             Device: \(UIDevice.current.modelName)
             """,
-            subject: "Reading List Feedback"
+            subject: "Reading List Feedback",
+            attachments: emailAttachments
         )
     }
 }

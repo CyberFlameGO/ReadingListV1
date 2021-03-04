@@ -98,7 +98,7 @@ final class BackupManager {
     func restore(from backup: BackupInfo, completion: @escaping (RestorationFailure?) -> Void) {
         // First, check that we recognise the backup's model version. It must not be a later version that
         // what this version of the app supports.
-        guard let modelVersion = BooksModelVersion(rawValue: backup.markerFileInfo.modelVersion) else {
+        guard let modelVersion = BooksModelVersion.allCases.first(where: { $0.modelName == backup.markerFileInfo.modelVersion }) else {
             completion(.unsupportedVersion)
             return
         }

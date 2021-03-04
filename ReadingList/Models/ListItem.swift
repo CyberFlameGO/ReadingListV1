@@ -9,13 +9,14 @@ import CoreData
 @objc(ListItem)
 class ListItem: NSManagedObject {
     @NSManaged var sort: Int32
-    @NSManaged private(set) var book: Book
-    @NSManaged private(set) var list: List
+    @NSManaged private(set) var book: Book?
+    @NSManaged private(set) var list: List?
 
     convenience init(context: NSManagedObjectContext, book: Book, list: List, sort: Int32) {
         self.init(context: context)
         self.book = book
         self.sort = sort
         self.list = list
+        self.remoteIdentifier = ListItemRecordName(bookRemoteIdentifier: book.remoteIdentifier, listRemoteIdentifier: list.remoteIdentifier).fullRecordName
     }
 }

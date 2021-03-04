@@ -79,6 +79,7 @@ final class TabBarController: UITabBarController {
             case .tip: destination = hostingDetail(Tip(), title: "Tip")
             case .importExport: destination = UIStoryboard.ImportExport.instantiateRoot()
             case .backup: destination = UIStoryboard.Backup.instantiateRoot()
+            case .icloudSync: destination = hostingDetail(CloudSync())
             case .privacy: destination = hostingDetail(Privacy())
             case .none: destination = UIViewController()
             }

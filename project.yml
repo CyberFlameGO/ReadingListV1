@@ -45,9 +45,18 @@ packages:
   SVProgressHUD:
     url: https://github.com/sereivoanyong/SVProgressHUD.git # Fork with SPM support
     branch: master
+  Reachability:
+    url: https://github.com/ashleymills/Reachability.swift.git
+    minorVersion: 5.1.0
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation.git
     minorVersion: 0.9.0
+  CocoaLumberjack:
+    url: https://github.com/CocoaLumberjack/CocoaLumberjack.git
+    minorVersion: 3.7.0
+  SwiftLog:
+    url: https://github.com/Apple/swift-log.git
+    minorVersion: 1.4.0
 
 fileGroups:
   - Debug/
@@ -93,6 +102,13 @@ targets:
       - package: Promises
       - package: CHCSVParser
       - package: SVProgressHUD
+      - package: Reachability
+      - package: CocoaLumberjack
+        product: CocoaLumberjackSwift
+      - package: CocoaLumberjack
+        product: CocoaLumberjackSwiftLogBackend
+      - package: SwiftLog
+        product: Logging
       - package: ZIPFoundation
       - package: Firebase
         product: FirebaseCrashlytics

@@ -84,6 +84,7 @@ final class ManageLists: UITableViewController {
             guard let listName = listName else { preconditionFailure() }
             let childContext = PersistentStoreManager.container.viewContext.childContext()
             let createdList = List(context: childContext, name: listName)
+            createdList.setRemoteIdentifier()
             createdList.addBooks(books.map { $0.inContext(childContext) })
             childContext.saveAndLogIfErrored()
             onComplete?(createdList)

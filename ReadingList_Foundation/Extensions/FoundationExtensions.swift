@@ -245,6 +245,16 @@ public extension Array where Element: Equatable {
     }
 }
 
+public extension Dictionary {
+    mutating func append<ArrayValue>(_ value: ArrayValue, to key: Key) where Value == [ArrayValue] {
+        if self[key] != nil {
+            self[key]!.append(value)
+        } else {
+            self[key] = [value]
+        }
+    }
+}
+
 public extension Date {
     init?(_ dateString: String?, format: String) {
         guard let dateString = dateString else { return nil }

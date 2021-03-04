@@ -1,16 +1,19 @@
 import Foundation
 import UIKit
 import CoreData
+import Combine
 
 final class ListBookTable: UITableViewController {
 
     var list: List!
+    var displayedSortOrder: BookSort!
     private var cachedListNames: [String]!
-    private var ignoreNotifications = false
 
     private var searchController: UISearchController!
     private var dataSource: ListBookDiffableDataSource!
     private var emptyStateManager: ListBookTableEmptyDataSetManager!
+
+    var cancellables = Set<AnyCancellable>()
 
     private var listNameField: UITextField? {
         get { return navigationItem.titleView as? UITextField }
@@ -45,16 +48,31 @@ final class ListBookTable: UITableViewController {
         searchController.delegate = self
         navigationItem.searchController = searchController
 
-        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), searchController: searchController, onContentChanged: reloadHeaders)
+        displayedSortOrder = list.order
+        let sortManager = SortManager<ListItem>(tableView) { [unowned self] in
+            self.dataSource.getItem(at: $0)
+        }
+        dataSource = ListBookDiffableDataSource(tableView, list: list, controller: buildResultsControllerAndFetch(), sortManager: sortManager, searchController: searchController) { [weak self] in
+            self?.reloadHeaders()
+        }
 
         // Configure the empty state manager to detect when the table becomes empty
         emptyStateManager = ListBookTableEmptyDataSetManager(tableView: tableView, navigationBar: navigationController?.navigationBar, navigationItem: navigationItem, searchController: searchController, list: list)
         dataSource.emptyDetectionDelegate = emptyStateManager
         dataSource.updateData(animate: false)
 
-        NotificationCenter.default.addObserver(self, selector: #selector(objectContextChanged(_:)),
-                                               name: .NSManagedObjectContextObjectsDidChange,
-                                               object: PersistentStoreManager.container.viewContext)
+        PersistentStoreManager.container.viewContext.updatedObjectsPublisher().sink { [weak self] ids in
+            guard let self = self else { return }
+            let objects = Set(ids.map(PersistentStoreManager.container.viewContext.object(with:)))
+            self.respondToDataChanges(updatedObjects: objects)
+        }.store(in: &cancellables)
+
+        PersistentStoreManager.container.viewContext.deletedObjectsPublisher().sink { [weak self] ids in
+            guard let self = self else { return }
+            if ids.contains(self.list.objectID) {
+                self.navigationController?.popViewController(animated: false)
+            }
+        }.store(in: &cancellables)
     }
 
     private func buildResultsControllerAndFetch() -> NSFetchedResultsController<ListItem> {
@@ -127,7 +145,16 @@ final class ListBookTable: UITableViewController {
     }
 
     @objc private func configureNavigationItem() {
-        guard let editDoneButton = navigationItem.rightBarButtonItem else { assertionFailure(); return }
+        configureEditButton()
+        searchController.searchBar.isEnabled = !isEditing
+        configureListTitleField()
+    }
+
+    private func configureEditButton() {
+        guard let editDoneButton = navigationItem.rightBarButtonItem else {
+            assertionFailure()
+            return
+        }
         editDoneButton.isEnabled = {
             if let listNameField = listNameField {
                 if !listNameField.isEditing { return true }
@@ -136,7 +163,9 @@ final class ListBookTable: UITableViewController {
             }
             return true
         }()
-        searchController.searchBar.isEnabled = !isEditing
+    }
+
+    private func configureListTitleField() {
         if isEditing {
             if listNameField == nil {
                 guard let navigationBar = navigationController?.navigationBar else {
@@ -165,44 +194,34 @@ final class ListBookTable: UITableViewController {
         // result controller.
         self.dataSource.controller = buildResultsControllerAndFetch()
         dataSource.updateData(animate: true)
+        displayedSortOrder = list.order
 
-        // Put the top row at the "middle", so that the top row is not right up at the top of the table
-        //is this needed? tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .middle, animated: false)
         UserEngagement.logEvent(.changeListSortOrder)
     }
 
-    @objc private func objectContextChanged(_ notification: Notification) {
-        guard !ignoreNotifications else { return }
-        guard let userInfo = notification.userInfo else { return }
-
-        if let deletedObjects = userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>, deletedObjects.contains(list!) {
-            // If the list was deleted, pop back. This can't happen through any normal means at the moment.
-            navigationController?.popViewController(animated: false)
-            return
-        }
-
+    private func respondToDataChanges(updatedObjects: Set<NSManagedObject>) {
         // The fetched results controller only detects changes to the ListItem, not only related objects such as the Book.
         // This means that book changes don't get reflected in this screen straight-away. To address this, check each save
         // to see whether any updated objects were books which have ListItems which associate with this list.
-        if let updatedObjects = userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-            let updatedBooks = updatedObjects.compactMap { $0 as? Book }
-            if !updatedBooks.isEmpty {
-                var snapshot = self.dataSource.controller.snapshot()
-                for updatedBook in updatedBooks {
-                    snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
-                }
-                self.dataSource.updateData(snapshot, animate: false)
+        let updatedBooks = updatedObjects.compactMap { $0 as? Book }
+        if !updatedBooks.isEmpty {
+            var snapshot = self.dataSource.snapshot()
+            for updatedBook in updatedBooks {
+                snapshot.reloadItems(updatedBook.listItems.filter { $0.list == self.list }.map(\.objectID))
+            }
+            self.dataSource.updateData(snapshot, animate: true)
+        }
+
+        let updatedLists = updatedObjects.compactMap { $0 as? List }
+        if updatedLists.contains(list) {
+            configureListTitleField()
+            if displayedSortOrder != list.order {
+                sortOrderChanged()
             }
         }
 
         // Repopulate the list names cache
         cachedListNames = List.names(fromContext: PersistentStoreManager.container.viewContext)
-    }
-
-    private func ignoringSaveNotifications(_ block: () -> Void) {
-        ignoreNotifications = true
-        block()
-        ignoreNotifications = false
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -215,7 +234,7 @@ final class ListBookTable: UITableViewController {
 
     override func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath) -> [UITableViewRowAction]? {
         return [UITableViewRowAction(style: .destructive, title: "Remove") { _, indexPath in
-            self.dataSource.controller.object(at: indexPath).deleteAndSave()
+            self.dataSource.getItem(at: indexPath).deleteAndSave()
             UserEngagement.logEvent(.removeBookFromList)
         }]
     }
@@ -263,7 +282,7 @@ extension ListBookTable: UISearchResultsUpdating {
 extension ListBookTable: HeaderConfigurable {
     func configureHeader(_ header: UITableViewHeaderFooterView, at index: Int) {
         guard let header = header as? BookTableHeader else { preconditionFailure() }
-        let numberOfRows = dataSource.controller.sections![0].numberOfObjects
+        let numberOfRows = dataSource.snapshot().numberOfItems
         header.configure(list: list, bookCount: numberOfRows, enableSort: !isEditing && !searchController.isActive)
     }
 }

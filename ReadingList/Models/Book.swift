@@ -1,6 +1,7 @@
 import Foundation
 import CoreData
 import os.log
+import CloudKit
 
 @objc(Book)
 class Book: NSManagedObject {
@@ -35,13 +36,15 @@ class Book: NSManagedObject {
 
     @NSManaged private(set) var listItems: Set<ListItem>
     var lists: [List] {
-        listItems.map(\.list)
+        listItems.compactMap { $0.list }
     }
 
     override func awakeFromInsert() {
         super.awakeFromInsert()
         addedWhen = Date()
     }
+
+    @NSManaged var remoteIdentifier: String
 
     func setToRead() {
         readState = .toRead
@@ -220,6 +223,26 @@ class Book: NSManagedObject {
         for subject in subjects where subject.books.count == 1 {
             subject.delete()
             os_log("Orphaned subject %{public}s deleted.", type: .info, subject.name)
+        }
+    }
+
+    @discardableResult
+    func trySetRemoteIdentifier() -> Bool {
+        if let googleBooksId = googleBooksId {
+            remoteIdentifier = "gbid:\(googleBooksId)"
+            return true
+        } else if let manualBookId = manualBookId {
+            remoteIdentifier = "mid:\(manualBookId)"
+            return true
+        } else {
+            return false
+        }
+    }
+
+    func setRemoteIdentifier() {
+        if !trySetRemoteIdentifier() {
+            logger.critical("Book \(objectID.uriRepresentation().path) has neither Google Books ID nor Manual Book ID")
+            fatalError("No google book or manual book ID")
         }
     }
 }

@@ -19,7 +19,7 @@ extension UITableViewCell {
 final class Organize: UITableViewController {
 
     var searchController: UISearchController!
-    var dataSource: OrganizeTableViewDataSourceCommon!
+    var dataSource: OrganizeTableViewDataSource!
     var emptyDataSetManager: OrganizeEmptyDataSetManager!
 
     override func viewDidLoad() {
@@ -33,7 +33,10 @@ final class Organize: UITableViewController {
         searchController.delegate = self
         navigationItem.searchController = searchController
 
-        dataSource = OrganizeTableViewDataSource(tableView: tableView, resultsController: buildResultsController())
+        let sortManager = SortManager<List>(tableView) { [unowned self] in
+            self.dataSource.getItem(at: $0)
+        }
+        dataSource = OrganizeTableViewDataSource(tableView: tableView, resultsController: buildResultsController(), sortManager: sortManager)
         emptyDataSetManager = OrganizeEmptyDataSetManager(tableView: tableView, navigationBar: navigationController?.navigationBar, navigationItem: navigationItem, searchController: searchController) { [weak self] _ in
             self?.configureNavigationBarButtons()
         }
@@ -137,7 +140,7 @@ final class Organize: UITableViewController {
             },
             UIContextualAction(style: .normal, title: "Rename") { _, _, callback in
                 self.setEditing(false, animated: true)
-                let list = self.dataSource.resultsController.object(at: indexPath)
+                let list = self.dataSource.getItem(at: indexPath)
                 self.renameList(list) { didRename in
                     callback(didRename)
                 }
@@ -147,7 +150,7 @@ final class Organize: UITableViewController {
 
     @IBAction private func addWasTapped(_ sender: UIBarButtonItem) {
         present(ManageLists.newListAlertController([]) { list in
-            guard let indexPath = self.dataSource.resultsController.indexPath(forObject: list) else {
+            guard let indexPath = self.dataSource.indexPath(for: list.objectID) else {
                 assertionFailure()
                 return
             }
@@ -159,7 +162,7 @@ final class Organize: UITableViewController {
         let confirmDelete = UIAlertController(title: "Confirm delete", message: nil, preferredStyle: .actionSheet)
 
         confirmDelete.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            self.dataSource.resultsController.object(at: indexPath).deleteAndSave()
+            self.dataSource.getItem(at: indexPath).deleteAndSave()
             UserEngagement.logEvent(.deleteList)
             self.setEditing(false, animated: true)
             didDelete?(true)
@@ -176,9 +179,9 @@ final class Organize: UITableViewController {
         if let listBookTable = segue.destination as? ListBookTable {
             let list: List
             if let index = sender as? IndexPath {
-                list = dataSource.resultsController.object(at: index)
+                list = dataSource.getItem(at: index)
             } else if let cell = sender as? UITableViewCell, let index = tableView.indexPath(for: cell) {
-                list = dataSource.resultsController.object(at: index)
+                list = dataSource.getItem(at: index)
             } else { preconditionFailure() }
 
             listBookTable.list = list
@@ -196,7 +199,7 @@ final class Organize: UITableViewController {
         return UIContextMenuConfiguration(identifier: indexPath as NSIndexPath, previewProvider: nil) { _ in
             UIMenu(title: "", children: [
                 UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { _ in
-                    let list = self.dataSource.resultsController.object(at: indexPath)
+                    let list = self.dataSource.getItem(at: indexPath)
                     self.renameList(list)
                 },
                 UIAction(title: "Delete", image: UIImage(systemName: "trash.fill"), attributes: .destructive) { _ in

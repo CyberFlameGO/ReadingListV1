@@ -207,6 +207,7 @@ final class SearchOnline: UITableViewController {
             .then(on: .main) { fetchResult -> Book in
                 let book = Book(context: context)
                 book.populate(fromFetchResult: fetchResult)
+                book.setRemoteIdentifier()
                 return book
             }
     }

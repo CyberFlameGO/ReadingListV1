@@ -4,6 +4,7 @@ excluded:
 identifier_name:
   excluded:
     - id
+    - ID
     - at
 line_length:
   - 200

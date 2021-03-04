@@ -4,6 +4,7 @@ import os.log
 
 public protocol ModelVersion: Equatable, CaseIterable {
     var modelName: String { get }
+    var mappingModelToSuccessorName: String { get }
     static var modelBundle: Bundle { get }
     static var modelDirectoryName: String { get }
 }
@@ -62,11 +63,40 @@ public extension ModelVersion {
     func mappingModelToSuccessor() -> NSMappingModel? {
         guard let nextVersion = successor else { return nil }
         os_log("Loading specified mapping model used for step %{public}s to %{public}s", type: .info, modelName, nextVersion.modelName)
-        guard let mapping = NSMappingModel(from: [Self.modelBundle], forSourceModel: managedObjectModel(), destinationModel: nextVersion.managedObjectModel()) else {
+        guard let mapping = NSMappingModel(contentsOf: Self.modelBundle.url(forResource: mappingModelToSuccessorName, withExtension: "cdm")) else {
             // If there is no mapping model, build an inferred one
             os_log("No specified mapping model exists; creating inferred mapping model", type: .info)
             return try! NSMappingModel.inferredMappingModel(forSourceModel: managedObjectModel(), destinationModel: successor!.managedObjectModel())
         }
+
+        // We have observed a strange bug (we assume) where a newly created model mapping file will have incorrect entity version
+        // hashes. Could not find a way to correct these during the creation or modification of the mapping model. This prevents
+        // us from being able to load a mapping model by just providing the source and destination models, as they aren't recognised.
+        // Instead we load the mapping model directly from a URL and adjust it to fix the dodgy entity version hashes.
+        let sourceModel = managedObjectModel()
+        let destinationModel = nextVersion.managedObjectModel()
+
+        var newEntityMappings = [NSEntityMapping]()
+        for entityMapping in mapping.entityMappings {
+            guard let sourceEntityName = entityMapping.sourceEntityName else { fatalError("No sourceEntityName") }
+            guard let destinationEntityName = entityMapping.destinationEntityName else { fatalError("No destnationEntityName") }
+
+            let sourceModelEntityVersionHash = sourceModel.entityVersionHashesByName[sourceEntityName]
+            let destinationModelEntityVersionHash = destinationModel.entityVersionHashesByName[destinationEntityName]
+
+            if entityMapping.sourceEntityVersionHash != sourceModelEntityVersionHash {
+                logger.info("Mapping model source entity version hash was different to the source model version hash; fixing this")
+                entityMapping.sourceEntityVersionHash = sourceModelEntityVersionHash
+            }
+            if entityMapping.destinationEntityVersionHash != destinationModelEntityVersionHash {
+                logger.info("Mapping model destination entity version hash was different to the destination model version hash; fixing this")
+                entityMapping.destinationEntityVersionHash = destinationModelEntityVersionHash
+            }
+            entityMapping.destinationEntityVersionHash = destinationModelEntityVersionHash
+            newEntityMappings.append(entityMapping)
+        }
+
+        mapping.entityMappings = newEntityMappings
         return mapping
     }
 

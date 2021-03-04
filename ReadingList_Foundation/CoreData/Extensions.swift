@@ -49,6 +49,7 @@ public extension NSManagedObject {
     }
 
     func inContext(_ context: NSManagedObjectContext) -> Self {
+        guard managedObjectContext !== context else { return self }
         return context.object(with: objectID) as! Self
     }
 }

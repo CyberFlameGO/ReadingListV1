@@ -119,6 +119,8 @@ class UserEngagement {
         case changeSearchOnlineLanguage = "Change_Search_Online_Language"
         case changeCsvImportFormat = "Change_CSV_Import_Format"
         case changeCsvImportSettings = "Change_CSV_Import_Settings"
+        case enableCloudSync = "Enable_Cloud_Sync"
+        case disableCloudSync = "Disable_Cloud_Sync"
 
         // Other
         case viewOnAmazon = "View_On_Amazon"
