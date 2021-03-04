@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import CoreData
 import ZIPFoundation
-import os.log
 
 final class BackupManager {
     /**
@@ -29,7 +28,7 @@ final class BackupManager {
         do {
             backupsFolderContents = try FileManager.default.pathsWithinDirectory(backupsDirectory)
         } catch {
-            os_log("Could not read paths within directory %{public}s: %{public}s", type: .error, backupsDirectory.path, error.localizedDescription)
+            logger.error("Could not read paths within directory \(backupsDirectory.path): \(error.localizedDescription)")
             return []
         }
 
@@ -44,7 +43,7 @@ final class BackupManager {
                 let backupInfo = BackupInfo(markerFileInfo: markerFile, backupDirectory: backupFolder, backupDataFilePath: backupDataFilePath)
                 backupInfos.append(backupInfo)
             } catch {
-                os_log("Error getting backup info from file %{public}s: %{public}s", type: .error, backupFolder.path, error.localizedDescription)
+                logger.error("Error getting backup info from file \(backupFolder.path): \(error.localizedDescription)")
                 continue
             }
         }
@@ -112,7 +111,7 @@ final class BackupManager {
         do {
             try FileManager.default.unzipItem(at: backup.backupDataFilePath, to: backupDataArchiveUnzipped)
         } catch {
-            os_log("Error unzipping archive %{public}s: %{public}s", type: .error, backup.backupDataFilePath.path, error.localizedDescription)
+            logger.error("Error unzipping archive \(backup.backupDataFilePath.path): \(error.localizedDescription)")
             completion(.unpackArchiveFailure(error))
             return
         }
@@ -127,7 +126,7 @@ final class BackupManager {
         do {
             try PersistentStoreManager.container.copyPersistentStores(to: currentStoreBackup)
         } catch {
-            os_log("Error creating current store backup: %{public}s", type: .error, error.localizedDescription)
+            logger.error("Error creating current store backup: \(error.localizedDescription)")
 
             // No need to keep the unzipped archive: delete it
             try? FileManager.default.removeItem(at: backupDataArchiveUnzipped)
@@ -158,6 +157,7 @@ final class BackupManager {
                 completion(nil)
             }
         } catch {
+            logger.error("Error while restoring from backup: \(error.localizedDescription)")
             let restorationFailure: RestorationFailure = hasReplacedStore ? .initialisationFailure(error) : .replaceStoreFailure(error)
             // If we failed during the replacement of the store, then let's try to put the backup back in place, using the current (latest) managed object model.
             let restorationStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: BooksModelVersion.latest.managedObjectModel())
@@ -181,7 +181,7 @@ final class BackupManager {
             } catch {
                 // This is a serious failure, and it's not clear what this means. The existing store may be OK, or it may be broken.
                 // We can try to hope that the app remains functional.
-                os_log("Error while attempting store recovery during backup restoration. The persistent store is now in an unknown state. %{public}s", type: .error, error.localizedDescription)
+                logger.critical("Error while attempting store recovery during backup restoration. The persistent store is now in an unknown state. \(error.localizedDescription)")
 
                 // Clear out temporary files - the current-store backup, and the backup unzip directory
                 try? FileManager.default.removeItem(at: currentStoreBackupDir)
@@ -215,7 +215,7 @@ final class BackupManager {
 
         // Get the target data directory
         let dataArchivePath = URL(fileURLWithPath: BackupConstants.backupDataArchiveName, isDirectory: false, relativeTo: currentInstallBackupDirectory)
-        os_log("Writing backup to %{public}s", dataArchivePath.path)
+        logger.info("Writing backup to \(dataArchivePath.path)")
 
         // Ensure the backup directory exists
         try? FileManager.default.createDirectory(at: currentInstallBackupDirectory, withIntermediateDirectories: true, attributes: nil)
@@ -241,11 +241,11 @@ final class BackupManager {
             if let sizeAttribute = attributes[.size] as? UInt64 {
                 backupSize = sizeAttribute
             } else {
-                os_log("Unexpected missing or non UInt64 size attribute", type: .error)
+                logger.error("Unexpected missing or non UInt64 size attribute")
                 backupSize = 0
             }
         } catch {
-            os_log("Error calculating backup size on disk: %{public}s", type: .error, error.localizedDescription)
+            logger.error("Error calculating backup size on disk: \(error.localizedDescription)")
             backupSize = 0
         }
 
@@ -254,7 +254,7 @@ final class BackupManager {
             // We already checked that UIDevice.current.identifierForVendor is non-nil at the top of this function; it should
             // not go from being non-nil to being nil. The only reason BackupMarkerFileInfo.init() may return nil is if
             // identifierForVendor is nil.
-            preconditionFailure("BackupMarkerFileInfo.init() unexpectedly returned nil")
+            fatalError("BackupMarkerFileInfo.init() unexpectedly returned nil")
         }
         let markerFileData = try JSONEncoder().encode(markerFileInfo)
         try markerFileData.write(to: backupInfoURL)
