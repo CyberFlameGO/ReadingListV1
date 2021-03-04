@@ -2,7 +2,6 @@ import Foundation
 import PersistedPropertyWrapper
 import BackgroundTasks
 import UIKit
-import os.log
 
 enum BackupFrequencyPeriod: Int, CaseIterable {
     case daily = 1
@@ -101,18 +100,18 @@ class AutoBackupManager {
     func scheduleBackup(startingAfter earliestBeginDate: Date? = nil) {
         guard let backupInterval = backupFrequency.duration else { return }
         guard FileManager.default.ubiquityIdentityToken != nil else {
-            os_log("No iCloud user logged in; not scheduling background backup.")
+            logger.info("No iCloud user logged in; not scheduling background backup.")
             return
         }
 
         let request = BGProcessingTaskRequest(identifier: backgroundTaskIdentifier)
         if let earliestBeginDate = earliestBeginDate {
             request.earliestBeginDate = earliestBeginDate
-            os_log("Scheduled iCloud backup to start after %{public}s", earliestBeginDate.string(withDateFormat: "yyyy-MM-dd HH:mm:ss"))
+            logger.info("Scheduled iCloud backup to start after \(earliestBeginDate.string(withDateFormat: "yyyy-MM-dd HH:mm:ss"))")
         } else if let lastBackup = lastBackupCompletion {
             let nextBackupStartDate = lastBackup.advanced(by: backupInterval)
             request.earliestBeginDate = nextBackupStartDate
-            os_log("Scheduled iCloud backup to start %d seconds after last backup, at %{public}s", backupInterval, nextBackupStartDate.string(withDateFormat: "yyyy-MM-dd HH:mm:ss"))
+            logger.info("Scheduled iCloud backup to start \(backupInterval) seconds after last backup, at \( nextBackupStartDate.string(withDateFormat: "yyyy-MM-dd HH:mm:ss"))")
         }
 
         do {
@@ -125,10 +124,10 @@ class AutoBackupManager {
             switch bgTaskError.code {
             case .tooManyPendingTaskRequests: fatalError("Unexpected 'tooManyPendingTaskRequests' error when scheduling background task")
             case .notPermitted: fatalError("Unexpected 'notPermitted' error when scheduling background task")
-            case .unavailable: os_log("Background task scheduling is unavailable", type: .error)
+            case .unavailable: logger.error("Background task scheduling is unavailable")
             @unknown default:
                 UserEngagement.logError(error)
-                os_log("Unknown background task scheduling error with code %d", type: .error, bgTaskError.code.rawValue)
+                logger.error("Unknown background task scheduling error with code \(bgTaskError.code.rawValue)")
             }
         }
     }
@@ -146,7 +145,7 @@ class AutoBackupManager {
         }
 
         // Use a dispatch queue to ensure synchronised access to hasRunBackup
-        os_log("Persistent container was not initialised when handling backup task: registering a notification observer")
+        logger.info("Persistent container was not initialised when handling backup task: registering a notification observer")
         dispatchQueue.async {
             var hasRunBackup = false
             var observer: NSObjectProtocol?
@@ -158,10 +157,10 @@ class AutoBackupManager {
                 // another check of persistent store manager container just afterwards.
                 self.dispatchQueue.async {
                     guard !hasRunBackup else {
-                        os_log("Backup has already been run; exiting")
+                        logger.info("Backup has already been run; exiting")
                         return
                     }
-                    os_log("Running backup in response to initialisationCompletion notification")
+                    logger.info("Running backup in response to initialisationCompletion notification")
                     self.performBackupFromTask(task)
                 }
             }
@@ -170,7 +169,7 @@ class AutoBackupManager {
             // the notification observers. If that happened, we will never observe the notification (we missed it) so we need to
             // check the initialisation of the container again.
             if PersistentStoreManager.container != nil {
-                os_log("Persistent store container is non-nil straight after registering initialisation completion notification observer")
+                logger.info("Persistent store container is non-nil straight after registering initialisation completion notification observer")
                 guard let observer = observer else { fatalError("Unexpected nil observer object") }
                 NotificationCenter.default.removeObserver(observer)
                 self.performBackupFromTask(task)
@@ -187,7 +186,7 @@ class AutoBackupManager {
             UserEngagement.logEvent(.autoBackup)
             task.setTaskCompleted(success: true)
         } catch {
-            os_log("Background backup task failed: %{public}s", type: .error, error.localizedDescription)
+            logger.error("Background backup task failed: \(error.localizedDescription)")
             lastAutoBackupFailed = true
             UserEngagement.logError(error)
             task.setTaskCompleted(success: false)

@@ -1,6 +1,5 @@
 import CoreData
 import CoreSpotlight
-import os.log
 
 class PersistentStoreManager {
 
@@ -15,7 +14,7 @@ class PersistentStoreManager {
     */
     static func initalisePersistentStore(completion: @escaping () -> Void) throws {
         if container != nil {
-            os_log("Reinitialising persistent container")
+            logger.info("Reinitialising persistent container")
         }
 
         // Register our custom transformer for Author tranformable attributes
@@ -47,7 +46,7 @@ class PersistentStoreManager {
     static func moveStoreFromLegacyLocationIfNecessary() {
         let legacyStoreLocation = URL.documents.appendingPathComponent(storeFileName)
         if FileManager.default.fileExists(atPath: legacyStoreLocation.path) && !FileManager.default.fileExists(atPath: storeLocation.path) {
-            os_log("Store located in Documents directory; migrating to Application Support directory")
+            logger.info("Store located in Documents directory; migrating to Application Support directory")
             let tempStoreCoordinator = NSPersistentStoreCoordinator()
             try! tempStoreCoordinator.replacePersistentStore(
                 at: storeLocation,
@@ -65,7 +64,7 @@ class PersistentStoreManager {
      Deletes all objects of the given type
     */
     static func delete<T>(type: T.Type) where T: NSManagedObject {
-        os_log("Deleting all %{public}s objects", String(describing: type))
+        logger.info("Deleting all \(String(describing: type)) objects")
         let batchDelete = NSBatchDeleteRequest(fetchRequest: type.fetchRequest())
         batchDelete.resultType = .resultTypeObjectIDs
         let result = try! PersistentStoreManager.container.persistentStoreCoordinator.execute(batchDelete, with: container.viewContext)

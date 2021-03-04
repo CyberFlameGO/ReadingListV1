@@ -3,7 +3,6 @@ import CoreData
 import WidgetKit
 import ImageIO
 import UIKit
-import os.log
 import Combine
 
 @available(iOS 14.0, *)
@@ -54,14 +53,14 @@ class BookDataSharer {
             let finishedBooksData = finishedBooks.map { $0.buildSharedData() }
 
             if forceUpdate || currentBooksData != SharedBookData.currentBooks {
-                os_log("Updating and reloading Current Books widget timelines", type: .default)
+                logger.info("Updating and reloading Current Books widget timelines")
                 DispatchQueue.main.async {
                     SharedBookData.currentBooks = currentBooksData
                     WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.currentBooks)
                 }
             }
             if forceUpdate || finishedBooksData != SharedBookData.finishedBooks {
-                os_log("Updating and reloading Finished Books widget timelines", type: .default)
+                logger.info("Updating and reloading Finished Books widget timelines")
                 DispatchQueue.main.async {
                     SharedBookData.finishedBooks = finishedBooksData
                     WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.finishedBooks)
@@ -101,16 +100,16 @@ fileprivate extension Book {
 
         // Only resize the image if is more than 100KB in size
         guard coverImage.count > 100 * 1024 else { return coverImage }
-        os_log("Generating a thumbnail image for cover data (initial size %d)", type: .default, coverImage.count)
+        logger.info("Generating a thumbnail image for cover data (initial size \(coverImage.count)")
 
         guard let image = UIImage(data: coverImage) else {
-            os_log("Could not initialise image from data", type: .error)
+            logger.error("Could not initialise image from data")
             return nil
         }
 
         // A large file-size image but with small width... if this happens, let's just skip the image.
         guard image.size.height > 100 else {
-            os_log("Unexpected image size when generating a thumbnail: %d x %d", type: .error, image.size.width, image.size.height)
+            logger.error("Unexpected image size when generating a thumbnail: \(image.size.width) x \(image.size.height)")
             return nil
         }
 
@@ -125,14 +124,14 @@ fileprivate extension Book {
 
         guard let imageSource = CGImageSourceCreateWithData(coverImage as NSData, options),
               let imageReference = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options) else {
-            os_log("Error generating image thumbnail", type: .error)
+            logger.error("Error generating image thumbnail")
             return nil
         }
         guard let thumbnailData = UIImage(cgImage: imageReference).pngData() else {
-            os_log("Thumbnail image generation returned no data", type: .error)
+            logger.error("Thumbnail image generation returned no data")
             return nil
         }
-        os_log("Thumbnail image generated with size %d", type: .default, thumbnailData.count)
+        logger.error("Thumbnail image generated with size \(thumbnailData.count)")
         return thumbnailData
     }
 

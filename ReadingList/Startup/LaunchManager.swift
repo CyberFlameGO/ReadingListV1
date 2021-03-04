@@ -1,7 +1,6 @@
 import Foundation
 import SwiftyStoreKit
 import SVProgressHUD
-import os.log
 import CoreData
 import Reachability
 import PersistedPropertyWrapper
@@ -91,7 +90,7 @@ class LaunchManager {
         DispatchQueue.global(qos: .userInteractive).async {
             do {
                 try PersistentStoreManager.initalisePersistentStore {
-                    os_log("Persistent store loaded", type: .info)
+                    logger.info("Persistent store loaded")
                     DispatchQueue.main.async {
                         self.initialiseAfterPersistentStoreLoad()
                         onSuccess()
@@ -138,17 +137,17 @@ class LaunchManager {
             if let urlAction = ProprietaryURLManager().getAction(from: url) {
                 return ProprietaryURLActionHandler(window: window).handle(urlAction)
             } else {
-                os_log("Unparsable URL: %{public}s", type: .error, url.absoluteString)
+                logger.error("Unparsable URL: \(url.absoluteString)")
                 return false
             }
         } else {
-            os_log("Unrecognised URL type; handling not possible: %{public}s", type: .error, url.absoluteString)
+            logger.error("Unrecognised URL type; handling not possible: \(url.absoluteString)")
             return false
         }
     }
 
     private func openCsvFileInApp(url: URL) -> Bool {
-        os_log("Opening CSV file URL: %{public}s", type: .default, url.absoluteString)
+        logger.info("Opening CSV file URL: \(url.absoluteString)")
 
         guard let tabBarController = window?.rootViewController as? TabBarController else {
             fatalError("Missing root tab bar controller")
@@ -190,7 +189,7 @@ class LaunchManager {
             BookDataSharer.instance.inititialise(persistentContainer: PersistentStoreManager.container)
             if AppLaunchHistory.lastLaunchedBuildInfo?.buildNumber != BuildInfo.thisBuild.buildNumber || BuildInfo.thisBuild.type == .debug {
                 // Not strictly a save, but the first time we launch an updated version of the app, we ought to repopulate the shared book data
-                os_log("Repopulating shared book data for widget", type: .default)
+                logger.info("Repopulating shared book data for widget")
                 BookDataSharer.instance.handleChanges(forceUpdate: true)
             }
         }
