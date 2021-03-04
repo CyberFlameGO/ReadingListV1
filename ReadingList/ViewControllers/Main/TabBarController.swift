@@ -80,7 +80,6 @@ final class TabBarController: UITabBarController {
             case .importExport: destination = UIStoryboard.ImportExport.instantiateRoot()
             case .backup: destination = UIStoryboard.Backup.instantiateRoot()
             case .icloudSync: destination = hostingDetail(CloudSync())
-            case .privacy: destination = hostingDetail(Privacy())
             case .none: destination = UIViewController()
             }
             settings.showDetailViewController(destination, sender: settings)

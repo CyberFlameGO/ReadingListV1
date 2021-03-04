@@ -5,33 +5,13 @@ import FirebaseCrashlytics
 import PersistedPropertyWrapper
 
 class UserEngagement {
-
-    static var defaultAnalyticsEnabledValue: Bool {
-        #if DEBUG
-        return false
-        #else
-        return true
-        #endif
-    }
-
-    @Persisted("sendAnalytics", defaultValue: defaultAnalyticsEnabledValue)
-    static var sendAnalytics: Bool
-
-    @Persisted("sendCrashReports", defaultValue: defaultAnalyticsEnabledValue)
-    static var sendCrashReports: Bool
-
     static func initialiseUserAnalytics() {
-        guard BuildInfo.thisBuild.type == .testFlight || sendAnalytics || sendCrashReports else { return }
-
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
 
-        let enableCrashlyticsReporting = BuildInfo.thisBuild.type == .testFlight || sendCrashReports
-        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(enableCrashlyticsReporting)
-
-        let enableAnalyticsCollection = BuildInfo.thisBuild.type == .testFlight || sendAnalytics
-        Analytics.setAnalyticsCollectionEnabled(enableAnalyticsCollection)
+        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+        Analytics.setAnalyticsCollectionEnabled(true)
     }
 
     @Persisted("userEngagementCount", defaultValue: 0)
@@ -128,18 +108,14 @@ class UserEngagement {
     }
 
     static func logEvent(_ event: Event) {
-        // Note: TestFlight users are automatically enrolled in analytics reporting. This should be reflected
-        // on the corresponding Settings page.
-        guard BuildInfo.thisBuild.type == .testFlight || sendAnalytics else { return }
         #if RELEASE
         Analytics.logEvent(event.rawValue, parameters: nil)
         #endif
     }
 
     static func logError(_ error: Error) {
-        // Note: TestFlight users are automatically enrolled in crash reporting. This should be reflected
-        // on the corresponding Settings page.
-        guard BuildInfo.thisBuild.type == .testFlight || sendCrashReports else { return }
+        #if RELEASE
         Crashlytics.crashlytics().record(error: error)
+        #endif
     }
 }

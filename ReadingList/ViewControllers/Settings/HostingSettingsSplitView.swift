@@ -10,7 +10,6 @@ enum SettingsSelection {
     case importExport
     case backup
     case icloudSync
-    case privacy
 }
 
 class HostingSettingsSplitView: ObservableObject, HostingSplitView {
