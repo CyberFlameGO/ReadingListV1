@@ -20,18 +20,6 @@ class CloudSyncUISettings: ObservableObject {
     @Published var syncEnabled = CloudSyncSettings.settings.syncEnabled
 }
 
-extension Binding {
-    func didSet(execute: @escaping (Value) -> Void) -> Binding {
-        Binding(
-            get: { wrappedValue },
-            set: {
-                wrappedValue = $0
-                execute($0)
-            }
-        )
-    }
-}
-
 struct CloudSync: View {
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
     @ObservedObject var settings = CloudSyncUISettings()
@@ -63,6 +51,7 @@ struct CloudSync: View {
                     syncCoordinator.stop()
                 }
                 settings.syncEnabled = isEnabled
+                CloudSyncSettings.settings.syncEnabled = isEnabled
             }
         )
     }
