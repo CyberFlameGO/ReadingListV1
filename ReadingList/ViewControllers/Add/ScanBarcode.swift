@@ -327,6 +327,7 @@ final class ScanBarcode: UIViewController {
         let context = self.bulkAddContext ?? PersistentStoreManager.container.viewContext.childContext()
         let book = Book(context: context)
         book.populate(fromFetchResult: fetchResult)
+        book.setRemoteIdentifier()
 
         if self.bulkAddContext == nil {
             UserEngagement.logEvent(.scanBarcode)
