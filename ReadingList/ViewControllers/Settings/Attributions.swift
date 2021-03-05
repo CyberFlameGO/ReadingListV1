@@ -21,18 +21,21 @@ struct Attributions: View {
         SwiftUI.List {
             Section(header: HeaderText("Attributions", inset: hostingSplitView.isSplit)) {
                 Group {
-                    AttributionView(title: "Reading List App Icon", url: URL(string: "http://www.pixelresort.com/")!, text: ["PixelResort", "Designed by Michael Flarup"])
+                    AttributionView(title: "Reading List icon", url: URL(string: "http://www.pixelresort.com/")!, text: ["PixelResort", "Designed by Michael Flarup"])
                     AttributionLicenceView("CHCSVParser", url: "https://github.com/davedelong/CHCSVParser", copyright: "2014 Dave DeLong", license: .mit)
+                    AttributionLicenceView("CocoaLumberjack", url: "https://github.com/CocoaLumberjack/CocoaLumberjack", copyright: "2010-2021 Deusty, LLC", license: .bsd3)
                     AttributionLicenceView("Cosmos", url: "https://github.com/evgenyneu/Cosmos", copyright: "2015 Evgenii Neumerzhitckii", license: .mit)
                     AttributionLicenceView("Eureka", url: "https://github.com/xmartlabs/Eureka", copyright: "2015 XMARTLABS", license: .mit)
                     AttributionLicenceView("Icons8", url: "https://icons8.com", copyright: "Icons8", license: .ccByNd3)
                     AttributionLicenceView("PersistedPropertyWrapper", url: "https://github.com/AndrewBennet/PersistedPropertyWrapper", copyright: "2020 Andrew Bennet", license: .mit)
                     AttributionLicenceView("Promises", url: "https://github.com/google/promises", copyright: "2018 Google Inc", license: .apache2)
+                    AttributionLicenceView("Reachability", url: "https://github.com/ashleymills/Reachability.swift", copyright: "2016 Ashley Mills", license: .mit)
                     AttributionLicenceView("Regex", url: "https://github.com/sharplet/Regex", copyright: "2015 Adam Sharp", license: .mit)
-                    AttributionLicenceView("SwiftyStoreKit", url: "https://github.com/bizz84/SwiftyStoreKit", copyright: "2015-2017 Andrea Bizzotto", license: .mit)
-                    AttributionLicenceView("SVProgressHUD", url: "https://github.com/SVProgressHUD/SVProgressHUD", copyright: "2011-2018 Sam Vermette, Tobias Tiemerding and contributors", license: .mit)
                 }
                 Group {
+                    AttributionLicenceView("SwiftLog", url: "https://github.com/apple/swift-log", copyright: "2021 Apple Inc", license: .apache2)
+                    AttributionLicenceView("SwiftyStoreKit", url: "https://github.com/bizz84/SwiftyStoreKit", copyright: "2015-2017 Andrea Bizzotto", license: .mit)
+                    AttributionLicenceView("SVProgressHUD", url: "https://github.com/SVProgressHUD/SVProgressHUD", copyright: "2011-2018 Sam Vermette, Tobias Tiemerding and contributors", license: .mit)
                     AttributionLicenceView("WhatsNewKit", url: "https://github.com/SvenTiigi/WhatsNewKit", copyright: "2020 Sven Tiigi", license: .mit)
                     AttributionLicenceView("ZIPFoundation", url: "https://github.com/weichsel/ZIPFoundation", copyright: "2017-2020 Thomas Zoechling", license: .mit)
                 }
@@ -75,12 +78,17 @@ struct AttributionView: View {
     let text: [String]
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(title).font(.body)
-            ForEach(text, id: \.self) {
-                Text($0).font(.caption)
+        HStack {
+            VStack(alignment: .leading) {
+                Text(title).font(.body)
+                ForEach(text, id: \.self) {
+                    Text($0).font(.caption)
+                }
             }
-        }.presentingSafari(url)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .presentingSafari(url)
     }
 }
 
@@ -88,12 +96,14 @@ enum License: CustomStringConvertible {
     case mit
     case ccByNd3
     case apache2
+    case bsd3
 
     var description: String {
         switch self {
         case .mit: return "MIT"
         case .ccByNd3: return "CC-BY-ND 3.0"
         case .apache2: return "Apache 2.0"
+        case .bsd3: return "BSD-3-Clause"
         }
     }
 }
