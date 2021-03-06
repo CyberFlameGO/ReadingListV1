@@ -101,7 +101,7 @@ final class BackupRestoreProgress: FullScreenProgress {
             return
         }
 
-        os_log("Download status: %{public}s", type: .info, downloadingStatus)
+        logger.info("Download status: \(downloadingStatus)")
         if downloadingStatus == NSMetadataUbiquitousItemDownloadingStatusCurrent {
             logger.info("Backup archive is downloaded; stopping query & restoring data...")
             stopAndRemoveQuery()
