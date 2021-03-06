@@ -44,6 +44,7 @@ class UserEngagement {
         case csvGoodReadsImport = "CSV_Import_Goodreads"
         case csvExport = "CSV_Export"
         case deleteAllData = "Delete_All_Data"
+        case forceFullCloudSync = "Force_Full_Cloud_Sync"
 
         // Backup
         case createBackup = "Create_Backup"

@@ -61,6 +61,7 @@ struct CloudSyncAdvanced: View {
                     buttons: [
                         .destructive(Text("Resync")) {
                             guard let syncCoordinator = AppDelegate.shared.syncCoordinator else { return }
+                            UserEngagement.logEvent(.forceFullCloudSync)
                             syncCoordinator.forceFullResync()
                         },
                         .cancel()
