@@ -63,8 +63,8 @@ final class ImportExport: UITableViewController {
         // The CONFIRM DELETE action:
         let confirmDelete = UIAlertController(title: "Final Warning", message: "This action is irreversible. Are you sure you want to continue?", preferredStyle: .alert)
         confirmDelete.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            DeleteAllManager.shared.deleteAll()
             UserEngagement.logEvent(.deleteAllData)
+            DeleteAllManager.shared.deleteAll()
         })
         confirmDelete.addAction(UIAlertAction(title: "Cancel", style: .cancel))
 
