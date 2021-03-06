@@ -71,7 +71,10 @@ final class BackupRestoreProgress: FullScreenProgress {
 
         if isDownloaded {
             logger.info("Backup data is already downloaded: restoring")
-            restoreData(using: backupInfo)
+            // Delay for a couple of seconds to try to allow other app stuff to wrap up
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.restoreData(using: self.backupInfo)
+            }
         } else {
             logger.info("Backup data is not downloaded: downloading then restoring")
             downloadThenRestore(backup: backupInfo)

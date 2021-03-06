@@ -27,7 +27,7 @@ class DeleteAllManager {
 
             logger.info("Initialising persistent store")
             try! PersistentStoreManager.initalisePersistentStore {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                DispatchQueue.main.async {
                     logger.info("Reinitialising persistent store coordinator")
                     AppDelegate.shared.initialiseSyncCoordinator()
 

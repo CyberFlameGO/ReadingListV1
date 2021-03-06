@@ -5,7 +5,7 @@ import UIKit
 import PersistedPropertyWrapper
 
 class DownstreamSyncProcessor {
-    weak var coordinator: SyncCoordinator!
+    weak var coordinator: SyncCoordinator?
     let orderedTypesToSync: [CKRecordRepresentable.Type]
     let syncContext: NSManagedObjectContext
     let cloudOperationQueue: ConcurrentCKQueue
@@ -42,13 +42,13 @@ class DownstreamSyncProcessor {
             recordsByType.append(record, to: record.recordType)
             guard let recordSchemaVersion = record[SyncConstants.recordSchemaVersionKey] as? Int else {
                 logger.critical("CKRecord did not have a \(SyncConstants.recordSchemaVersionKey) property")
-                self.coordinator.stopSyncDueToError(.unexpectedResponse("Record had no \(SyncConstants.recordSchemaVersionKey) property"))
+                self.coordinator?.stopSyncDueToError(.unexpectedResponse("Record had no \(SyncConstants.recordSchemaVersionKey) property"))
                 return
             }
             if recordSchemaVersion > SyncConstants.recordSchemaVersion.rawValue {
                 logger.error("CKRecord schema version was \(recordSchemaVersion) but the current schema version is \(SyncConstants.recordSchemaVersion.rawValue)")
                 operation.cancel()
-                self.coordinator.disableSyncDueOutOfDateLocalAppVersion()
+                self.coordinator?.disableSyncDueOutOfDateLocalAppVersion()
             }
         }
 
@@ -136,7 +136,7 @@ class DownstreamSyncProcessor {
                 } else if let records = records {
                     self.commitServerChangesToDatabase(with: Array(records.values), deletedRecordIDs: [])
                 } else {
-                    self.coordinator.stopSyncDueToError(
+                    self.coordinator?.stopSyncDueToError(
                         .unexpectedResponse("CKFetchRecordsOperation had neither error nor records")
                     )
                 }
@@ -149,7 +149,7 @@ class DownstreamSyncProcessor {
 
     private func handleDownloadError(_ error: Error) {
         guard let ckError = error as? CKError else {
-            self.coordinator.stopSyncDueToError(.unexpectedErrorType(error))
+            self.coordinator?.stopSyncDueToError(.unexpectedErrorType(error))
             return
         }
 
@@ -171,7 +171,7 @@ class DownstreamSyncProcessor {
             }
         } else {
             logger.critical("Unhandled error response \(ckError)")
-            self.coordinator.stopSyncDueToError(.unhandledError(ckError))
+            self.coordinator?.stopSyncDueToError(.unhandledError(ckError))
         }
     }
 
@@ -219,6 +219,10 @@ class DownstreamSyncProcessor {
     }
 
     private func saveRecordDataLocally(_ ckRecord: CKRecord) {
+        guard let coordinator = coordinator else {
+            logger.error("SyncCoordinator was nil, not saving CKRecord data")
+            return
+        }
         if let localObject = localDataMatcher.lookupLocalObject(for: ckRecord) {
             if localObject.ckRecordEncodedSystemFields == nil {
                 logger.info("Merging \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
@@ -226,7 +230,7 @@ class DownstreamSyncProcessor {
                 // TODO we need to somehow enqueue this to be repushed. Setting the transaction author perhaps?
             } else {
                 logger.info("Updating \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
-                let keysPendingUpdate = self.coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
+                let keysPendingUpdate = coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
                 if !keysPendingUpdate.isEmpty {
                     logger.info("Excluding key from update due to pending upload: \(keysPendingUpdate.joined(separator: ", "))")
                 }
