@@ -43,8 +43,10 @@ struct AppIconCellRow: View {
         .withButtonAction {
             UIApplication.shared.setAlternateIconName(alternateIconName) { error in
                 if let error = error {
+                    logger.error("Error changing app icon: \(error)")
                     UserEngagement.logError(error)
                 } else {
+                    logger.info("Changed app icon to \(alternateIconName ?? "Default")")
                     selectedIconName = alternateIconName
                     NotificationCenter.default.post(name: .appIconChanged, object: nil)
                 }
