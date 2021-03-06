@@ -208,10 +208,10 @@ class UpstreamSyncProcessor {
             }
 
         if !uploadOpertion.recordsToSave!.isEmpty {
-            logger.debug("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
+            logger.trace("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
         }
         if !uploadOpertion.recordIDsToDelete!.isEmpty {
-            logger.debug("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
+            logger.trace("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
         }
     }
 
@@ -308,8 +308,13 @@ class UpstreamSyncProcessor {
                 }
                 // TODO We should probably re-upload this somehow. Another buffer of non-uploaded records?
                 localObject.setSystemFields(nil)
+            } else if uploadError.code == .invalidArguments {
+                // TODO What causes this?
+                logger.error("InvalidArguments error\n\(ckError)\nfor record:\n\(record)")
+                coordinator.handleUnexpectedResponse()
             } else {
-                logger.error("Unhandled error \(uploadError.code.name) for CKRecord \(record.recordID.recordName)")
+                logger.error("Unhandled error\n\(ckError)\nfor record:\n\(record)")
+                coordinator.handleUnexpectedResponse()
             }
         }
 
