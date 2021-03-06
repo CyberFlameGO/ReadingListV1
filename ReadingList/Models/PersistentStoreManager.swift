@@ -59,20 +59,4 @@ class PersistentStoreManager {
             tempStoreCoordinator.destroyAndDeleteStore(at: legacyStoreLocation)
         }
     }
-
-    /**
-     Deletes all objects of the given type
-    */
-    static func delete<T>(type: T.Type) where T: NSManagedObject {
-        logger.info("Deleting all \(String(describing: type)) objects")
-        let batchDelete = NSBatchDeleteRequest(fetchRequest: type.fetchRequest())
-        batchDelete.resultType = .resultTypeObjectIDs
-        let result = try! PersistentStoreManager.container.persistentStoreCoordinator.execute(batchDelete, with: container.viewContext)
-        guard let deletedObjectIds = (result as? NSBatchDeleteResult)?.result as? [NSManagedObjectID] else {
-            preconditionFailure("Unexpected batch delete result format: \(result)")
-        }
-        if deletedObjectIds.isEmpty { return }
-        NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deletedObjectIds],
-                                            into: [PersistentStoreManager.container.viewContext])
-    }
 }

@@ -28,10 +28,22 @@ class Debug {
         if CommandLine.arguments.contains("--UITests_PopulateData") {
             loadData(downloadImages: CommandLine.arguments.contains(screenshotsCommand)) {
                 if CommandLine.arguments.contains("--UITests_DeleteLists") {
-                    PersistentStoreManager.delete(type: List.self)
+                    deleteAllLists()
                 }
             }
         }
+    }
+
+    static func deleteAllLists() {
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: List.fetchRequest())
+        batchDelete.resultType = .resultTypeObjectIDs
+        let result = try! PersistentStoreManager.container.persistentStoreCoordinator.execute(batchDelete, with: PersistentStoreManager.container.viewContext)
+        guard let deletedObjectIds = (result as? NSBatchDeleteResult)?.result as? [NSManagedObjectID] else {
+            preconditionFailure("Unexpected batch delete result format: \(result)")
+        }
+        if deletedObjectIds.isEmpty { return }
+        NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deletedObjectIds],
+                                            into: [PersistentStoreManager.container.viewContext])
     }
 
     static func loadData(downloadImages: Bool, _ completion: (() -> Void)?) {
