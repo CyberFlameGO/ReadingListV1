@@ -1,7 +1,6 @@
 import Foundation
 import CoreData
 import UIKit
-import os.log
 
 public extension NSManagedObject {
     /// Can be useful when requiring a sort keyPath which points to a property which is the same for all objects.
@@ -92,7 +91,7 @@ public extension NSPersistentStoreCoordinator {
             try FileManager.default.removeItem(at: URL(fileURLWithPath: url.path.appending("-shm")))
             try FileManager.default.removeItem(at: URL(fileURLWithPath: url.path.appending("-wal")))
         } catch {
-            os_log("Failed to destroy or delete persistent store at %{public}s: %{public}s", type: .error, url.path, error.localizedDescription)
+            logger.error("Failed to destroy or delete persistent store at \(url.path): \(error.localizedDescription)")
         }
     }
 }

@@ -1,6 +1,5 @@
 import Foundation
 import CoreData
-import os.log
 
 // Adapted from https://gist.github.com/atomicbird/25fed73657be4b9d3642981a4892fea4
 // "Backup and restore Core Data persistent stores" by Tom Harrington
@@ -45,7 +44,7 @@ public extension NSPersistentContainer {
                 // Remove the existing persistent store first
                 try persistentStoreCoordinator.remove(persistentStore)
             } catch {
-                os_log("Error removing store: %{public}@", type: .error, error.localizedDescription)
+                logger.error("Error removing store: \(error.localizedDescription)")
                 throw CopyPersistentStoreErrors.copyStoreError("Could not remove persistent store before restore")
             }
             do {

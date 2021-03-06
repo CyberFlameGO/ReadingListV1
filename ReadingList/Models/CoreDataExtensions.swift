@@ -1,6 +1,5 @@
 import Foundation
 import CoreData
-import os.log
 
 extension NSManagedObjectContext {
 
@@ -25,7 +24,7 @@ extension NSManagedObjectContext {
         // triggers a save of *this* object (i.e. the child context's parent) in response to a save on the child context.
         NotificationCenter.default.addObserver(self, selector: #selector(saveAndLogIfErrored), name: .NSManagedObjectContextDidSave, object: childContext)
 
-        os_log("Created child context %s", type: .debug, childContext.name!)
+        logger.info("Created child context \(childContext.name!)")
         return childContext
     }
 
@@ -41,7 +40,7 @@ extension NSManagedObjectContext {
         guard !insertedObjects.isEmpty else { return }
         let temporaryObjects = Array(insertedObjects.filter { $0.objectID.isTemporaryID })
         guard !temporaryObjects.isEmpty else { return }
-        os_log("Obtaining permanent IDs for %d objects", type: .debug, temporaryObjects.count)
+        logger.debug("Obtaining permanent IDs for \(temporaryObjects.count) objects")
         try! obtainPermanentIDs(for: temporaryObjects)
     }
 
