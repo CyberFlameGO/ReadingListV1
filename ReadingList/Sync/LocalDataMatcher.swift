@@ -15,7 +15,7 @@ struct LocalDataMatcher {
             return localItem
         }
 
-        let localIdLookup = type.fetchRequest()
+        let localIdLookup = type.fetchRequest(in: syncContext)
         localIdLookup.fetchLimit = 1
         localIdLookup.predicate = NSCompoundPredicate(
             andPredicateWithSubpredicates: [
@@ -34,7 +34,7 @@ struct LocalDataMatcher {
     }
 
     func lookupLocalObject(ofType type: CKRecordRepresentable.Type, withIdentifier recordName: String) -> CKRecordRepresentable? {
-        let fetchRequest = type.fetchRequest()
+        let fetchRequest = type.fetchRequest(in: syncContext)
         fetchRequest.predicate = type.remoteIdentifierPredicate(recordName)
         fetchRequest.fetchLimit = 1
         return (try! syncContext.fetch(fetchRequest)).first as? CKRecordRepresentable

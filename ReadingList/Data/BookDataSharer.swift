@@ -38,15 +38,15 @@ class BookDataSharer {
     @objc func handleChanges(forceUpdate: Bool = false) {
         let backgroundContext = persistentContainer.newBackgroundContext()
         backgroundContext.perform { [unowned self] in
-            let readingFetchRequest = fetchRequest(itemLimit: bookRetrievalCount, readState: .reading)
+            let readingFetchRequest = fetchRequest(context: backgroundContext, itemLimit: bookRetrievalCount, readState: .reading)
             var currentBooks = try! backgroundContext.fetch(readingFetchRequest)
 
             if currentBooks.count < bookRetrievalCount {
-                let toReadFetchRequest = fetchRequest(itemLimit: bookRetrievalCount - currentBooks.count, readState: .toRead)
+                let toReadFetchRequest = fetchRequest(context: backgroundContext, itemLimit: bookRetrievalCount - currentBooks.count, readState: .toRead)
                 currentBooks.append(contentsOf: try! backgroundContext.fetch(toReadFetchRequest))
             }
 
-            let finishedBooksRequest = fetchRequest(itemLimit: bookRetrievalCount, readState: .finished, sortOrderOverride: .finishDate)
+            let finishedBooksRequest = fetchRequest(context: backgroundContext, itemLimit: bookRetrievalCount, readState: .finished, sortOrderOverride: .finishDate)
             let finishedBooks = try! backgroundContext.fetch(finishedBooksRequest)
 
             let currentBooksData = currentBooks.map { $0.buildSharedData() }
@@ -69,9 +69,9 @@ class BookDataSharer {
         }
     }
 
-    private func fetchRequest(itemLimit: Int, readState: BookReadState, sortOrderOverride: BookSort? = nil) -> NSFetchRequest<Book> {
+    private func fetchRequest(context: NSManagedObjectContext, itemLimit: Int, readState: BookReadState, sortOrderOverride: BookSort? = nil) -> NSFetchRequest<Book> {
         let fetchRequest = NSFetchRequest<Book>()
-        fetchRequest.entity = Book.entity()
+        fetchRequest.entity = Book.entity(in: context)
         fetchRequest.fetchLimit = itemLimit
         fetchRequest.returnsObjectsAsFaults = false
         fetchRequest.predicate = NSPredicate(format: "%K == %ld", #keyPath(Book.readState), readState.rawValue)

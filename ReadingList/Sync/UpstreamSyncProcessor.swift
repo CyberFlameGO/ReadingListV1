@@ -41,6 +41,10 @@ class UpstreamSyncProcessor {
         self.cancellables.removeAll()
     }
 
+    func reset() {
+        latestConfirmedUploadedTransaction = nil
+    }
+
     func enqueueUploadOperations() {
         if let bufferBookmark = self.bufferBookmark {
             addNewTransactionsToBuffer(since: bufferBookmark)
@@ -157,9 +161,8 @@ class UpstreamSyncProcessor {
 
     private func getAllObjectCkRecords() -> [CKRecord] {
         var ckRecords: [CKRecord] = []
-        for entity in orderedTypesToSync.map({ $0.entity() }) {
-            let request: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest()
-            request.entity = entity
+        for entity in orderedTypesToSync {
+            let request = entity.fetchRequest(in: syncContext)
             request.returnsObjectsAsFaults = false
             request.includesPropertyValues = true
             request.fetchBatchSize = 100
@@ -185,7 +188,7 @@ class UpstreamSyncProcessor {
             }
         let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
 
-        uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity()] }
+        uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity(in: syncContext)] }
             .flatMap { $0 }
             .compactMap { change, managedObject -> CKRecord? in
                 let ckKeysToUpload: [String]?

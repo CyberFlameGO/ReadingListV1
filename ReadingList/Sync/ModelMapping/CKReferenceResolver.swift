@@ -9,7 +9,7 @@ struct CKReferenceResolver {
     }
 
     func resolveReferences() {
-        let fetchRequest = ListItem.fetchRequest()
+        let fetchRequest = ListItem.fetchRequest(in: context)
         fetchRequest.predicate = NSPredicate.or([
             NSPredicate(format: "%K == nil", #keyPath(ListItem.book)),
             NSPredicate(format: "%K == nil", #keyPath(ListItem.list))
@@ -25,7 +25,7 @@ struct CKReferenceResolver {
                 continue
             }
             if result.book == nil {
-                let bookFetchRequest = Book.fetchRequest()
+                let bookFetchRequest = Book.fetchRequest(in: context)
                 bookFetchRequest.predicate = Book.withRemoteIdentifier(recordName.bookRemoteIdentifier)
                 bookFetchRequest.fetchLimit = 1
                 if let matchingBook = try! context.fetch(bookFetchRequest).first {
@@ -37,7 +37,7 @@ struct CKReferenceResolver {
             }
 
             if result.list == nil {
-                let listFetchRequest = List.fetchRequest()
+                let listFetchRequest = List.fetchRequest(in: context)
                 listFetchRequest.predicate = NSPredicate(format: "%K == %@", #keyPath(List.remoteIdentifier), recordName.listRemoteIdentifier)
                 listFetchRequest.fetchLimit = 1
                 if let matchingList = try! context.fetch(listFetchRequest).first {

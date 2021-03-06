@@ -47,7 +47,7 @@ extension ListItem: CKRecordRepresentable {
             sort = value?.asInt32 ?? 0
         case .book:
             guard let reference = value as? CKRecord.Reference else { return }
-            let request = Book.fetchRequest()
+            let request = Book.fetchRequest(in: managedObjectContext!)
             request.fetchLimit = 1
             request.predicate = NSPredicate(format: "%K == %@", SyncConstants.remoteIdentifierKeyPath, reference.recordID.recordName)
             guard let matchingBook = try! managedObjectContext!.fetch(request).first else {
@@ -57,7 +57,7 @@ extension ListItem: CKRecordRepresentable {
             setValue(matchingBook, forKey: #keyPath(ListItem.book))
         case .list:
             guard let reference = value as? CKRecord.Reference else { return }
-            let request = List.fetchRequest()
+            let request = List.fetchRequest(in: managedObjectContext!)
             request.fetchLimit = 1
             request.predicate = NSPredicate(format: "%K == %@", SyncConstants.remoteIdentifierKeyPath, reference.recordID.recordName)
             guard let matchingList = try! managedObjectContext!.fetch(request).first else {

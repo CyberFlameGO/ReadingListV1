@@ -101,6 +101,11 @@ final class SyncCoordinator {
         cloudOperationQueue.cancelAll()
         isStarted = false
     }
+    
+    func reset() {
+        upstreamProcessor.reset()
+        downstreamProcessor.resetChangeTracking()
+    }
 
     var isRunning: Bool {
         !cloudOperationQueue.operationQueue.isSuspended
@@ -141,7 +146,7 @@ final class SyncCoordinator {
     }
 
     func eraseSyncMetadata() {
-        let syncHelper = SyncResetter(managedObjectContext: self.syncContext, entityTypes: self.typesToSync.map { $0.entity() })
+        let syncHelper = SyncResetter(managedObjectContext: self.syncContext, entityTypes: self.typesToSync.map { $0.entity(in: syncContext) })
         syncHelper.eraseSyncMetadata()
     }
 
@@ -158,7 +163,7 @@ final class SyncCoordinator {
         var uploadedCounts = [String: Int]()
         syncContext.performAndWait {
             for type in typesToSync {
-                let fetchRequest = type.fetchRequest()
+                let fetchRequest = type.fetchRequest(in: syncContext)
                 let countResult = try! syncContext.count(for: fetchRequest)
                 totalCounts[type.ckRecordType] = countResult
 

@@ -89,7 +89,7 @@ extension CKRecordRepresentable {
 
     @discardableResult
     static func createObject(from ckRecord: CKRecord, in context: NSManagedObjectContext) -> Self {
-        let newItem = Self(context: context)
+        let newItem = Self(entity: entity(in: context), insertInto: context)
         newItem.remoteIdentifier = ckRecord.recordID.recordName
         newItem.update(from: ckRecord, excluding: [])
         return newItem

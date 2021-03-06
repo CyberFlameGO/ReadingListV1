@@ -51,6 +51,21 @@ public extension NSManagedObject {
         guard managedObjectContext !== context else { return self }
         return context.object(with: objectID) as! Self
     }
+
+    class func entity(in context: NSManagedObjectContext) -> NSEntityDescription {
+        let entityClassName = String(describing: self)
+        guard let entity = NSEntityDescription.entity(forEntityName: entityClassName, in: context) else {
+            fatalError("Could not find entity with name \(entityClassName)")
+        }
+        return entity
+    }
+    
+    class func fetchRequest(in context: NSManagedObjectContext) -> NSFetchRequest<NSFetchRequestResult> {
+        let entityDescription = entity(in: context)
+        let fetchRequest = NSFetchRequest<NSFetchRequestResult>()
+        fetchRequest.entity = entityDescription
+        return fetchRequest
+    }
 }
 
 public extension NSManagedObjectContext {
