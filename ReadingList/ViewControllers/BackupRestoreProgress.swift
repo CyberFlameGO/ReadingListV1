@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import os.log
 
 /// The possible states which a backup restoration may end with.
 enum BackupRestoreResult {
@@ -65,16 +64,16 @@ final class BackupRestoreProgress: FullScreenProgress {
         do {
             isDownloaded = try backupInfo.backupDataFilePath.isDownloaded()
         } catch {
-            os_log("Could not determine whether file is downloaded: %{public}s", type: .error, error.localizedDescription)
+            logger.error("Could not determine whether file is downloaded: \(error.localizedDescription)")
             isDownloaded = false
         }
         mode = isDownloaded ? .restoring : .downloading
 
         if isDownloaded {
-            os_log("Backup data is already downloaded: restoring")
+            logger.info("Backup data is already downloaded: restoring")
             restoreData(using: backupInfo)
         } else {
-            os_log("Backup data is not downloaded: downloading then restoring")
+            logger.info("Backup data is not downloaded: downloading then restoring")
             downloadThenRestore(backup: backupInfo)
         }
     }
@@ -93,24 +92,24 @@ final class BackupRestoreProgress: FullScreenProgress {
         guard let backupDataFileQuery = backupDataFileQuery else { return }
         let results = backupDataFileQuery.results
         guard results.count == 1, let metadataItem = results[0] as? NSMetadataItem else {
-            os_log("MetadataQuery did not return a NSMetadataItem for the data archive", type: .error)
+            logger.error("MetadataQuery did not return a NSMetadataItem for the data archive")
             completion(.failure(.missingDataArchive))
             return
         }
         guard let downloadingStatus = metadataItem.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String else {
-            os_log("Could not get downloading status for metadata item", type: .error)
+            logger.error("Could not get downloading status for metadata item")
             return
         }
 
         os_log("Download status: %{public}s", type: .info, downloadingStatus)
         if downloadingStatus == NSMetadataUbiquitousItemDownloadingStatusCurrent {
-            os_log("Backup archive is downloaded; stopping query & restoring data...")
+            logger.info("Backup archive is downloaded; stopping query & restoring data...")
             stopAndRemoveQuery()
 
             #if DEBUG
             // For development ease, allow us to enter a mode where the downloading screen is held in place for a long time
             if Debug.stayOnBackupRestorationDownloadScreen {
-                os_log("Debug setting stayOnBackupRestorationDownloadScreen is true; remaining on download view")
+                logger.info("Debug setting stayOnBackupRestorationDownloadScreen is true; remaining on download view")
                 return
             }
             #endif
@@ -159,20 +158,20 @@ final class BackupRestoreProgress: FullScreenProgress {
     private func scheduleNextPeriodicDownloadCheck() {
         let workItem = DispatchWorkItem {
             if Date(timeInterval: self.maximumDownloadDuration, since: self.startTime) < Date() {
-                os_log("Maximum download duration has elapsed; returning timeout error", type: .error)
+                logger.error("Maximum download duration has elapsed; returning timeout error")
                 self.stopAndRemoveQuery()
                 self.completion(.failure(.archiveDownloadTimeout))
                 return
             }
-            os_log("Periodic download status check running", type: .info)
+            logger.info("Periodic download status check running")
             self.checkDownloadProgress()
             if self.mode == .downloading {
-                os_log("Backup archive is still downloading after periodic download status check; scheduling next check", type: .info)
+                logger.info("Backup archive is still downloading after periodic download status check; scheduling next check")
                 self.scheduleNextPeriodicDownloadCheck()
             }
         }
         periodicDownloadStatusCheck = workItem
-        os_log("Scheduling periodic download check to run 5 seconds from now", type: .info)
+        logger.info("Scheduling periodic download check to run 5 seconds from now")
         downloadQueryDispatchQueue.asyncAfter(deadline: .now() + 5, execute: workItem)
     }
 
@@ -182,7 +181,7 @@ final class BackupRestoreProgress: FullScreenProgress {
             self.periodicDownloadStatusCheck?.cancel()
             BackupManager().restore(from: backup) { error in
                 if let error = error {
-                    os_log("Error restoring backup: %{public}s", type: .error, error.localizedDescription)
+                    logger.error("Error restoring backup: \(error.localizedDescription)")
                     self.completion(.failure(error))
                     return
                 }
