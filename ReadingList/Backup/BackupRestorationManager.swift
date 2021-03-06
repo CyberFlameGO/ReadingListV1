@@ -13,8 +13,10 @@ final class BackupRestorationManager {
     /// Switch to the backup restore screen, restore from the provided backup, and then switch back to the app's normal root controller when complete.
     func performRestore(from backup: BackupInfo) {
         guard let window = AppDelegate.shared.window else { fatalError("No window available when attempting to restore") }
-        AppDelegate.shared.syncCoordinator?.stop()
-        AppDelegate.shared.syncCoordinator = nil
+        if let syncCoordinator = AppDelegate.shared.syncCoordinator {
+            syncCoordinator.stop()
+            AppDelegate.shared.syncCoordinator = nil
+        }
         if #available(iOS 14.0, *) {
             BookDataSharer.instance.stop()
         }
