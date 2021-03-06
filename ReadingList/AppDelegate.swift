@@ -35,7 +35,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Grab any options which we will take action on after the persistent store is initialised
         let options = launchManager.extractRelevantLaunchOptions(launchOptions)
         launchManager.initialisePersistentStore {
-            self.initialiseSyncCoordinator()
+            let coordinator = self.initialiseSyncCoordinator()
+            if CloudSyncSettings.settings.syncEnabled {
+                coordinator.start()
+            }
             self.launchManager.handleLaunchOptions(options)
         }
 
@@ -43,16 +46,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return !options.any()
     }
 
-    func initialiseSyncCoordinator() {
+    @discardableResult
+    func initialiseSyncCoordinator() -> SyncCoordinator {
         // Initialise the Sync Coordinator which will maintain iCloud synchronisation
         let syncCoordinator = SyncCoordinator(
             persistentContainer: PersistentStoreManager.container,
             orderedTypesToSync: [Book.self, List.self, ListItem.self]
         )
         self.syncCoordinator = syncCoordinator
-        if CloudSyncSettings.settings.syncEnabled {
-            syncCoordinator.start()
-        }
+        return syncCoordinator
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {

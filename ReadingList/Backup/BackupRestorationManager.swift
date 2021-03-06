@@ -15,6 +15,7 @@ final class BackupRestorationManager {
         guard let window = AppDelegate.shared.window else { fatalError("No window available when attempting to restore") }
         if let syncCoordinator = AppDelegate.shared.syncCoordinator {
             syncCoordinator.stop()
+            CloudSyncSettings.settings.syncEnabled = false
             AppDelegate.shared.syncCoordinator = nil
         }
         if #available(iOS 14.0, *) {
@@ -27,13 +28,16 @@ final class BackupRestorationManager {
             DispatchQueue.main.async {
                 let newTabBarController = TabBarController()
                 window.rootViewController = newTabBarController
-                AppDelegate.shared.initialiseSyncCoordinator()
+
+                let syncCoordinator = AppDelegate.shared.initialiseSyncCoordinator()
+
                 if #available(iOS 14.0, *) {
                     BookDataSharer.instance.inititialise(persistentContainer: PersistentStoreManager.container)
                 }
                 switch result {
                 case .cancelled: break
                 case .success:
+                    syncCoordinator.reset()
                     let successAlert = UIAlertController(title: "Restore Complete", message: nil, preferredStyle: .alert)
                     successAlert.addAction(UIAlertAction(title: "OK", style: .cancel, handler: nil))
                     newTabBarController.present(successAlert, animated: true)
