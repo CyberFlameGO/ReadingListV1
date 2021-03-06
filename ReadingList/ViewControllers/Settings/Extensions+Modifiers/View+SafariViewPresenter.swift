@@ -26,7 +26,7 @@ struct SafariPresentingButton<ButtonLabel>: View where ButtonLabel: View {
             presenting.toggle()
         }) {
             buttonLabel
-        }.buttonStyle(PlainButtonStyle())
+        }
         .safariView(isPresented: $presenting) {
             SafariView(url: url)
         }
@@ -37,6 +37,6 @@ extension View {
     func presentingSafari(_ url: URL) -> some View {
         return SafariPresentingButton(url) {
             self
-        }
+        }.buttonStyle(PlainButtonStyle())
     }
 }
