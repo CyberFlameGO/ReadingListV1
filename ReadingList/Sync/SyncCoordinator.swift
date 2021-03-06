@@ -112,10 +112,10 @@ final class SyncCoordinator {
         disabledReason = reason
     }
 
-    func handleUnexpectedResponse() {
+    func stopSyncDueToError(_ error: SyncCoordinatorError) {
         logger.critical("Stopping SyncCoordinator due to unexpected response")
-        UserEngagement.logError(SyncCoordinatorError.unexpectedResponse)
-        disabledReason = .unexpectedResponse
+        UserEngagement.logError(error)
+        disabledReason = .unexpectedError
         stop()
     }
 

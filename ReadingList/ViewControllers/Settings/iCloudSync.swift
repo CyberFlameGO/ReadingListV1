@@ -157,7 +157,7 @@ extension SyncDisabledReason: CustomStringConvertible {
         switch self {
         case .outOfDateApp:
             return "Another device is using a more up-to-date version of Reading List. Please update the app via the App Store to resume syncing."
-        case .unexpectedResponse:
+        case .unexpectedError:
             return "An unexpected error occurred during syncing. Please contact the developer (Settings -> About -> Email Developer) to report this issue."
         case .userAccountChanged:
             return "The iCloud user account on this device was changed. To sync with the current iCloud user, re-enable iCloud Sync above."

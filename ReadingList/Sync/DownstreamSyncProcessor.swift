@@ -42,7 +42,7 @@ class DownstreamSyncProcessor {
             recordsByType.append(record, to: record.recordType)
             guard let recordSchemaVersion = record[SyncConstants.recordSchemaVersionKey] as? Int else {
                 logger.critical("CKRecord did not have a \(SyncConstants.recordSchemaVersionKey) property")
-                self.coordinator.handleUnexpectedResponse()
+                self.coordinator.stopSyncDueToError(.unexpectedResponse("Record had no \(SyncConstants.recordSchemaVersionKey) property"))
                 return
             }
             if recordSchemaVersion > SyncConstants.recordSchemaVersion.rawValue {
@@ -133,12 +133,12 @@ class DownstreamSyncProcessor {
             self.syncContext.performAndWait {
                 if let error = error {
                     self.handleDownloadError(error)
-                } else {
-                    guard let records = records else {
-                        self.coordinator.handleUnexpectedResponse()
-                        return
-                    }
+                } else if let records = records {
                     self.commitServerChangesToDatabase(with: Array(records.values), deletedRecordIDs: [])
+                } else {
+                    self.coordinator.stopSyncDueToError(
+                        .unexpectedResponse("CKFetchRecordsOperation had neither error nor records")
+                    )
                 }
             }
         }
@@ -149,7 +149,7 @@ class DownstreamSyncProcessor {
 
     private func handleDownloadError(_ error: Error) {
         guard let ckError = error as? CKError else {
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedErrorType(error))
             return
         }
 
@@ -171,7 +171,7 @@ class DownstreamSyncProcessor {
             }
         } else {
             logger.critical("Unhandled error response \(ckError)")
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unhandledError(ckError))
         }
     }
 

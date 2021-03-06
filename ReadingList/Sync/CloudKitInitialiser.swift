@@ -54,7 +54,9 @@ class CloudKitInitialiser {
                     self.coordinator.stop()
                 }
             } else {
-                self.coordinator.handleUnexpectedResponse()
+                self.coordinator.stopSyncDueToError(
+                    .unexpectedResponse("Fetch UserRecordID response had no success or failure arguments")
+                )
             }
         }
     }
@@ -79,7 +81,7 @@ class CloudKitInitialiser {
 
     private func handleCloudPreparationError(_ error: Error, rerunOperation: () -> Void) -> Bool {
         guard let ckError = error as? CKError else {
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedErrorType(error))
             return true
         }
 

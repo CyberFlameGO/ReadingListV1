@@ -55,7 +55,7 @@ class UpstreamSyncProcessor {
     private func handleLocalChangeNotification(_ notification: Notification) {
         guard let historyToken = notification.userInfo?[NSPersistentHistoryTokenKey] as? NSPersistentHistoryToken else {
             logger.critical("Could not find Persistent History Token from remote change notification")
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedResponse("Change notification had no NSPersistentHistoryToken"))
             return
         }
         logger.debug("Detected local change \(historyToken)")
@@ -100,7 +100,7 @@ class UpstreamSyncProcessor {
                     return
                 }
                 guard let transactionNotificationUserInfo = transaction.objectIDNotification().userInfo else {
-                    self.coordinator.handleUnexpectedResponse()
+                    self.coordinator.stopSyncDueToError(.unexpectedResponse("Merge notification UserInfo was nil"))
                     return
                 }
                 NSManagedObjectContext.mergeChanges(fromRemoteContextSave: transactionNotificationUserInfo, into: [self.syncContext])
@@ -227,7 +227,7 @@ class UpstreamSyncProcessor {
                     logger.info("Completed upload. Updating local models with server record data.")
                     guard let serverRecords = serverRecords else {
                         logger.error("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation")
-                        self.coordinator.handleUnexpectedResponse()
+                        self.coordinator.stopSyncDueToError(.unexpectedResponse("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation"))
                         return
                     }
                     self.updateLocalModelsAfterUpload(with: serverRecords)
@@ -241,7 +241,7 @@ class UpstreamSyncProcessor {
 
     private func handleUploadError(_ error: Error, records: [CKRecord], ids: [CKRecord.ID]) {
         guard let ckError = error as? CKError else {
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedErrorType(error))
             return
         }
 
@@ -254,7 +254,7 @@ class UpstreamSyncProcessor {
         if ckError.code == .limitExceeded {
             // TODO: Implement!
             logger.error("CloudKit batch limit exceeded, sending records in chunks")
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedResponse("CloudKit batch limit exceeded"))
         } else if ckError.code == .operationCancelled {
             return
         } else if ckError.code == .partialFailure {
@@ -276,14 +276,14 @@ class UpstreamSyncProcessor {
             }
         } else {
             logger.critical("Unhandled error response \(ckError)")
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unhandledError(ckError))
         }
     }
 
     private func handlePartialUploadFailure(_ ckError: CKError, records: [CKRecord], ids: [CKRecord.ID]) {
         guard let errorsByItemId = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] else {
             logger.error("Missing CKPartialErrorsByItemIDKey data")
-            self.coordinator.handleUnexpectedResponse()
+            self.coordinator.stopSyncDueToError(.unexpectedResponse("Missing CKPartialErrorsByItemIDKey data"))
             return
         }
 
@@ -291,7 +291,7 @@ class UpstreamSyncProcessor {
         for record in records {
             guard let uploadError = errorsByItemId[record.recordID] as? CKError else {
                 logger.error("Missing CKError for record \(record.recordID.recordName)")
-                self.coordinator.handleUnexpectedResponse()
+                self.coordinator.stopSyncDueToError(.unexpectedResponse("Missing CKError for record \(record.recordID.recordName)"))
                 return
             }
             if uploadError.code == .serverRecordChanged {
@@ -311,10 +311,10 @@ class UpstreamSyncProcessor {
             } else if uploadError.code == .invalidArguments {
                 // TODO What causes this?
                 logger.error("InvalidArguments error\n\(ckError)\nfor record:\n\(record)")
-                coordinator.handleUnexpectedResponse()
+                coordinator.stopSyncDueToError(.unhandledError(ckError))
             } else {
                 logger.error("Unhandled error\n\(ckError)\nfor record:\n\(record)")
-                coordinator.handleUnexpectedResponse()
+                coordinator.stopSyncDueToError(.unhandledError(ckError))
             }
         }
 
