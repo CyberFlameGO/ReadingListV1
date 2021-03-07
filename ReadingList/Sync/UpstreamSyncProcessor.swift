@@ -58,8 +58,7 @@ class UpstreamSyncProcessor {
 
     private func handleLocalChangeNotification(_ notification: Notification) {
         guard let historyToken = notification.userInfo?[NSPersistentHistoryTokenKey] as? NSPersistentHistoryToken else {
-            logger.critical("Could not find Persistent History Token from remote change notification")
-            self.coordinator?.stopSyncDueToError(.unexpectedResponse("Change notification had no NSPersistentHistoryToken"))
+            logger.error("Could not find Persistent History Token from remote change notification")
             return
         }
         logger.debug("Detected local change \(historyToken)")
