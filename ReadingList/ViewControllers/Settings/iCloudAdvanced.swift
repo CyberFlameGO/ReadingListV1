@@ -51,7 +51,8 @@ struct CloudSyncAdvanced: View {
                     dismissButton: .cancel()
                 )
             }
-            Button("Force Full Resync") {
+            // Removed as this can cause a long delay while errors are resolved.
+            /*Button("Force Full Resync") {
                 forceFullResyncSheetShowing = true
             }.foregroundColor(Color(.systemRed))
             .actionSheet(isPresented: $forceFullResyncSheetShowing) {
@@ -66,7 +67,7 @@ struct CloudSyncAdvanced: View {
                         },
                         .cancel()
                     ])
-            }
+            }*/
         }
     }
 }
