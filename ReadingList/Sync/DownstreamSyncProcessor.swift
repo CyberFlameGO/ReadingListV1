@@ -88,7 +88,7 @@ class DownstreamSyncProcessor {
             self.syncContext.performAndWait {
                 if let error = error {
                     logger.error("Error in recordZoneFetchCompletionBlock")
-                    self.handleDownloadError(error)
+                    // We shall handle the error once, in the final completion block
                 } else {
                     logger.info("Remote record fetch completed; commiting new change token")
                     processChanges(newToken: token)
@@ -98,15 +98,15 @@ class DownstreamSyncProcessor {
 
         operation.fetchRecordZoneChangesCompletionBlock = { [weak self] error in
             guard let self = self else { return }
-            self.syncContext.performAndWait {
-                if let error = error {
-                    logger.error("Remote change fetch completed with error")
-                    if let completion = completion {
-                        logger.info("Calling UIBackgroundFetch completion handler with failure")
-                        completion(.failed)
-                    }
-                    self.handleDownloadError(error)
-                } else {
+            if let error = error {
+                logger.error("Remote change fetch completed with error")
+                if let completion = completion {
+                    logger.info("Calling UIBackgroundFetch completion handler with failure")
+                    completion(.failed)
+                }
+                self.handleDownloadError(error)
+            } else {
+                self.syncContext.performAndWait {
                     logger.info("Remote change fetch completed successfully. Resolving any references")
                     CKReferenceResolver(context: self.syncContext).resolveReferences()
                     if let completion = completion {
@@ -157,9 +157,17 @@ class DownstreamSyncProcessor {
         if ckError.code == .operationCancelled {
             return
         } else if ckError.code == .changeTokenExpired {
-            logger.warning("Change token expired, resetting token and trying again")
+            logger.error("Change token expired, resetting token and trying again")
             self.remoteChangeToken = nil
             self.enqueueFetchRemoteChanges()
+        } else if ckError.code == .partialFailure {
+            guard let innerErrors = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecordZone.ID: CKError],
+                  let relevantInnerError = innerErrors[SyncConstants.zoneID] else {
+                logger.error("Missing inner error when fetching zone changes: \(ckError)")
+                self.coordinator?.stopSyncDueToError(.unexpectedResponse("Missing inner error when fetching zone changes"))
+                return
+            }
+            handleDownloadError(relevantInnerError)
         } else if let retryDelay = ckError.retryAfterSeconds {
             logger.info("Instructed to delay for \(retryDelay) seconds: suspending operation queue")
             self.cloudOperationQueue.suspend()
