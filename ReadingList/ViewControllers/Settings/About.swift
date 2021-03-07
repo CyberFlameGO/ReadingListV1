@@ -84,7 +84,7 @@ struct About: View {
                 }.actionSheet(isPresented: $isShowingShareLogsSheet) {
                     shareLogsSheet
                 }.sheet(isPresented: $isShowingShareLogsView) {
-                    ActivityViewController(activityItems: [logFilePath as Any])
+                    ActivityView(activityItems: [logFilePath as Any], applicationActivities: nil, excludedActivityTypes: nil)
                 }
 
                 if changeListProvider.thisVersionChangeList() != nil {
