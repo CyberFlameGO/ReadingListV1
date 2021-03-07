@@ -12,6 +12,9 @@ struct About: View {
     @State var isShowingMailView = false
     @State var isShowingLegacyMailAlert = false
     @State var isShowingFaq = false
+    @State var isShowingShareLogsSheet = false
+    @State var isShowingShareLogsView = false
+    @State var logFilePath: URL?
     @State var emailAttachments: [MailView.Attachment]?
     @EnvironmentObject var hostingSplitView: HostingSettingsSplitView
 
@@ -49,9 +52,7 @@ struct About: View {
                         }
                     }
                 }
-                .onAppear {
-                    gatherLogFile()
-                }.actionSheet(isPresented: $isShowingMailAlert) {
+                .actionSheet(isPresented: $isShowingMailAlert) {
                     mailAlert
                 }.sheet(isPresented: $isShowingMailView) {
                     emailSheet
@@ -76,6 +77,16 @@ struct About: View {
                          backgroundColor: Color(.darkGray)
                 ).navigating(to: PrivacyPolicy().environmentObject(hostingSplitView))
 
+                IconCell("Logs",
+                         imageName: "ant.fill",
+                         backgroundColor: Color(.systemIndigo)) {
+                    isShowingShareLogsSheet = true
+                }.actionSheet(isPresented: $isShowingShareLogsSheet) {
+                    shareLogsSheet
+                }.sheet(isPresented: $isShowingShareLogsView) {
+                    ActivityViewController(activityItems: [logFilePath as Any])
+                }
+
                 if changeListProvider.thisVersionChangeList() != nil {
                     IconCell("Recent Changes",
                              imageName: "wrench.fill",
@@ -84,6 +95,8 @@ struct About: View {
                     ).modal(ChangeListWrapper())
                 }
             }
+        }.onAppear {
+            gatherLogFile()
         }
         .possiblyInsetGroupedListStyle(inset: hostingSplitView.isSplit)
         .navigationBarTitle("About")
@@ -95,18 +108,19 @@ struct About: View {
                 $0 as? DDFileLogger
             }).first else { fatalError("No file logger found") }
 
-            var emailAttachmentData: Data?
-            if let logFilePath = fileLogger.logFileManager.sortedLogFilePaths.first {
-                let logFileURL = URL(fileURLWithPath: logFilePath)
+            var logFileData: Data?
+            if let firstLogFilePath = fileLogger.logFileManager.sortedLogFilePaths.first {
+                let logFile = URL(fileURLWithPath: firstLogFilePath)
+                self.logFilePath = logFile
                 do {
-                    try emailAttachmentData = Data(contentsOf: logFileURL)
+                    try logFileData = Data(contentsOf: logFile)
                 } catch {
                     logger.error("Error getting log file data for email: \(error.localizedDescription)")
                 }
             }
 
-            if let emailAttachmentData = emailAttachmentData {
-                emailAttachments = [MailView.Attachment(data: emailAttachmentData, mimeType: "text/plain", fileName: "ReadingList_Logs.txt")]
+            if let logFileData = logFileData {
+                emailAttachments = [MailView.Attachment(data: logFileData, mimeType: "text/plain", fileName: "ReadingList_Logs.txt")]
             } else {
                 emailAttachments = nil
             }
@@ -177,6 +191,22 @@ struct About: View {
             subject: "Reading List Feedback",
             attachments: emailAttachments
         )
+    }
+    
+    var shareLogsSheet: ActionSheet {
+        ActionSheet(
+            title: Text("Share Log Files"),
+            message: Text("""
+                Log files contain information about the running of the app, which can \
+                be useful when diagnosing issues. During email correspondance, I may \
+                ask you to provide me with the logs so I can investigate problems.
+                """),
+            buttons: [
+                .default(Text("Share")) {
+                    isShowingShareLogsView = true
+                },
+                .cancel()
+            ])
     }
 }
 
