@@ -8,6 +8,7 @@ struct SyncConstants {
     static let zoneID = CKRecordZone.ID(zoneName: "ReadingListZone", ownerName: CKCurrentUserDefaultName)
     static let recordSchemaVersionKey = "recordSchemaVersion"
     static let recordSchemaVersion: RecordSchemaVersion = .twoPointZeroPointZero
+    static let ckRecordEncodedSystemFieldsKey = "ckRecordEncodedSystemFields"
 }
 
 enum RecordSchemaVersion: Int {

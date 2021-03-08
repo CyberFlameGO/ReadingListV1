@@ -167,7 +167,7 @@ final class SyncCoordinator {
                 let countResult = try! syncContext.count(for: fetchRequest)
                 totalCounts[type.ckRecordType] = countResult
 
-                fetchRequest.predicate = NSPredicate(format: "ckRecordEncodedSystemFields != nil")
+                fetchRequest.predicate = NSPredicate(format: "\(SyncConstants.ckRecordEncodedSystemFieldsKey) != nil")
                 let uploadedCount = try! syncContext.count(for: fetchRequest)
                 uploadedCounts[type.ckRecordType] = uploadedCount
             }

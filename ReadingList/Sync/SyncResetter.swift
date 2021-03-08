@@ -16,7 +16,7 @@ struct SyncResetter {
             batchUpdate.resultType = .updatedObjectIDsResultType
             // We need to use the keypath on a concrete CKRecordRepresentable so that it is @objc visible
             batchUpdate.propertiesToUpdate = [
-                #keyPath(Book.ckRecordEncodedSystemFields): NSExpression(forConstantValue: nil)
+                SyncConstants.ckRecordEncodedSystemFieldsKey: NSExpression(forConstantValue: nil)
             ]
 
             let batchUpdateResults = try! managedObjectContext.execute(batchUpdate) as! NSBatchUpdateResult
