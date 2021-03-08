@@ -17,6 +17,7 @@ struct CKReferenceResolver {
         fetchRequest.fetchLimit = 100
 
         let results = try! context.fetch(fetchRequest) as! [ListItem]
+        if results.isEmpty { return }
         logger.info("\(results.count) unresolved ListItems to fix")
         for result in results {
             guard let recordName = ListItemRecordName(listItemRecordName: result.remoteIdentifier) else {
