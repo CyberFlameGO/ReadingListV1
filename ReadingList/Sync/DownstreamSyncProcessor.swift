@@ -163,12 +163,15 @@ class DownstreamSyncProcessor {
         }
 
         logger.error("Handling download CKError with code \(ckError.code.name)")
-        if ckError.code == .operationCancelled {
+        if ckError.code == .operationCancelled || ckError.code == .networkFailure || ckError.code == .networkUnavailable {
             return
         } else if ckError.code == .changeTokenExpired {
             logger.error("Change token expired, resetting token and trying again")
             self.remoteChangeToken = nil
             self.enqueueFetchRemoteChanges()
+        } else if ckError.code == .userDeletedZone {
+            coordinator?.handleCloudDataDeletion()
+            return
         } else if ckError.code == .partialFailure {
             guard let innerErrors = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecordZone.ID: CKError],
                   let relevantInnerError = innerErrors[SyncConstants.zoneID] else {

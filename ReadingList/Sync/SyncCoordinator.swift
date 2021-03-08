@@ -117,6 +117,18 @@ final class SyncCoordinator {
         disabledReason = reason
     }
 
+    func handleCloudDataDeletion() {
+        stop()
+        CloudSyncSettings.settings.syncEnabled = false
+        disabledReason = .cloudDataDeleted
+
+        syncContext.perform {
+            self.eraseSyncMetadata()
+        }
+        downstreamProcessor.resetChangeTracking()
+        upstreamProcessor.reset()
+    }
+
     func stopSyncDueToError(_ error: SyncCoordinatorError) {
         logger.critical("Stopping SyncCoordinator due to unexpected response")
         UserEngagement.logError(error)
@@ -128,7 +140,6 @@ final class SyncCoordinator {
         logger.error("Stopping SyncCoordinator because the server contains data which is from a newer version of the app")
         stop()
         disabledReason = .outOfDateApp
-        // TODO Consider caching this info and erasing upon upgrade, so we don't keep attempting to get data on every startup (maybe it doesn't matter)
     }
 
     func forceFullResync() {

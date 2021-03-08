@@ -5,7 +5,7 @@ import Logging
 
 class CloudKitInitialiser {
     private let cloudOperationQueue: ConcurrentCKQueue
-    weak var coordinator: SyncCoordinator!
+    weak var coordinator: SyncCoordinator?
 
     init(cloudOperationQueue: ConcurrentCKQueue) {
         self.cloudOperationQueue = cloudOperationQueue
@@ -43,7 +43,7 @@ class CloudKitInitialiser {
             if let recordID = recordID {
                 if let userRecordName = self.userRecordName, recordID.recordName != userRecordName {
                     logger.error("User record was previous stored as \(userRecordName), but is now \(recordID.recordName)")
-                    self.coordinator.disableSync(reason: .userAccountChanged)
+                    self.coordinator?.disableSync(reason: .userAccountChanged)
                 } else {
                     logger.info("User record name: \(recordID.recordName)")
                     self.userRecordName = recordID.recordName
@@ -51,10 +51,10 @@ class CloudKitInitialiser {
             } else if let error = error {
                 logger.error("Unhandled error fetching user record ID \(error)")
                 if !self.handleCloudPreparationError(error, rerunOperation: self.verifyUserRecordID) {
-                    self.coordinator.stop()
+                    self.coordinator?.stop()
                 }
             } else {
-                self.coordinator.stopSyncDueToError(
+                self.coordinator?.stopSyncDueToError(
                     .unexpectedResponse("Fetch UserRecordID response had no success or failure arguments")
                 )
             }
@@ -81,16 +81,16 @@ class CloudKitInitialiser {
 
     private func handleCloudPreparationError(_ error: Error, rerunOperation: () -> Void) -> Bool {
         guard let ckError = error as? CKError else {
-            self.coordinator.stopSyncDueToError(.unexpectedErrorType(error))
+            self.coordinator?.stopSyncDueToError(.unexpectedErrorType(error))
             return true
         }
 
         logger.error("Operation failed with code: \(ckError.code.name)")
         if ckError.code == .userDeletedZone {
-            coordinator.disableSync(reason: .cloudDataDeleted)
+            coordinator?.handleCloudDataDeletion()
             return true
         } else if ckError.code == .notAuthenticated {
-            coordinator.stop()
+            coordinator?.stop()
             return true
         } else if let retryAfter = ckError.retryAfterSeconds {
             self.cloudOperationQueue.suspend()
@@ -120,7 +120,7 @@ class CloudKitInitialiser {
 
             if let error = error {
                 if !self.handleCloudPreparationError(error, rerunOperation: self.createCustomZoneIfNeeded) {
-                    self.coordinator.stop()
+                    self.coordinator?.stop()
                 }
             } else {
                 logger.info("Zone created successfully")
@@ -179,7 +179,7 @@ class CloudKitInitialiser {
 
             if let error = error {
                 if !self.handleCloudPreparationError(error, rerunOperation: self.createPrivateSubscriptionsIfNeeded) {
-                    self.coordinator.stop()
+                    self.coordinator?.stop()
                 }
             } else {
                 logger.info("Private subscription created successfully")

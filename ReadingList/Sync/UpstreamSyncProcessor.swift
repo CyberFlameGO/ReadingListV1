@@ -88,6 +88,7 @@ class UpstreamSyncProcessor {
     }
 
     func enqueueUploadOperations() {
+        
         let markPendingTransactionCompleteOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
             self.markFirstPendingTransactionAsComplete()
@@ -262,16 +263,18 @@ class UpstreamSyncProcessor {
 
         logger.error("Upload error occurred with CKError code \(ckError.code.name)")
         if ckError.code == .limitExceeded {
-            // TODO: Implement!
-            logger.error("CloudKit batch limit exceeded, sending records in chunks")
-            self.coordinator?.stopSyncDueToError(.unexpectedResponse("CloudKit batch limit exceeded"))
-        } else if ckError.code == .operationCancelled {
+            logger.error("CloudKit batch limit exceeded. Current batch size: \(recordUploadBatchSize)")
+            recordUploadBatchSize /= 2
+            if recordUploadBatchSize == 0 {
+                self.coordinator?.stopSyncDueToError(.unexpectedResponse("CloudKit batch limit exceeded with batch size of 1"))
+            }
+        } else if ckError.code == .operationCancelled || ckError.code == .networkFailure || ckError.code == .networkUnavailable {
             return
         } else if ckError.code == .partialFailure {
             handlePartialUploadFailure(ckError, records: records, ids: ids)
         } else if ckError.code == .userDeletedZone {
             logger.info("Disabling sync due to deleted record zone")
-            self.coordinator?.disableSync(reason: .cloudDataDeleted)
+            self.coordinator?.handleCloudDataDeletion()
         } else if ckError.code == .notAuthenticated {
             logger.info("Disabling sync due to user not being authenticated")
             self.coordinator?.stop()
@@ -320,7 +323,7 @@ class UpstreamSyncProcessor {
                     logger.error("Could not find local object for CKRecord.")
                     return
                 }
-                // TODO We should probably re-upload this somehow. Another buffer of non-uploaded records?
+
                 localObject.setSystemFields(nil)
             } else if uploadError.code == .invalidArguments {
                 // TODO What causes this?
