@@ -143,6 +143,7 @@ class UpstreamSyncProcessor {
                     if let transactionNotificationUserInfo = transaction.objectIDNotification().userInfo {
                         NSManagedObjectContext.mergeChanges(fromRemoteContextSave: transactionNotificationUserInfo, into: [self.syncContext])
                     } else {
+                        logger.critical("Merge notification UserInfo was nil")
                         self.coordinator?.stopSyncDueToError(.unexpectedResponse("Merge notification UserInfo was nil"))
                         return
                     }
@@ -153,13 +154,15 @@ class UpstreamSyncProcessor {
                 if objectsForInsert.isEmpty {
                     uploadInsertsOperation.cancel()
                 } else {
+                    logger.info("Building CKRecords for \(objectsForInsert.count) insertions")
                     uploadInsertsOperation.recordsToSave = objectsForInsert.map { $0.buildCKRecord() }
                     self.traceOperationDetails(uploadInsertsOperation)
                 }
 
                 if let transaction = self.localTransactionsPendingPushCompletion.first {
                     if let changes = transaction.changes {
-                        logger.trace("Building CKRecords for local transaction consisting of changes:\n\(changes.description())")
+                        logger.info("Building CKRecords for local change transaction")
+                        logger.trace("Transaction changes: \(changes.description())")
                         var recordsForUpdate = self.buildCKRecordUpdates(for: changes)
                         var recordsForDeletion = self.buildCKRecordDeletionIDs(for: changes)
 
@@ -348,12 +351,12 @@ class UpstreamSyncProcessor {
         var refetchIDs = [CKRecord.ID]()
         for record in records {
             guard let uploadError = errorsByItemId[record.recordID] as? CKError else {
-                logger.error("Missing CKError for record \(record.recordID.recordName)")
-                self.coordinator?.stopSyncDueToError(.unexpectedResponse("Missing CKError for record \(record.recordID.recordName)"))
-                return
+                logger.debug("No CKError for record \(record.recordID.recordName)")
+                continue
             }
+
             if uploadError.code == .serverRecordChanged {
-                logger.info("CKRecord \(record.recordID.recordName) upload failed as server record has changed")
+                logger.error("CKRecord \(record.recordID.recordName) upload failed as server record has changed")
                 refetchIDs.append(record.recordID)
             } else if uploadError.code == .batchRequestFailed {
                 logger.trace("CKRecord \(record.recordID.recordName) part of failed upload batch")
@@ -377,8 +380,22 @@ class UpstreamSyncProcessor {
             }
         }
 
-        // TODO: We are not handling deletion failures at all. Do they need handling? Does any error exist which represents anything other than
-        // "the item was already deleted"?
+        for deletionID in ids {
+            guard let uploadError = errorsByItemId[deletionID] as? CKError else {
+                logger.debug("No CKError for deletion record ID \(deletionID.recordName)")
+                continue
+            }
+            if uploadError.code == .batchRequestFailed {
+                logger.trace("CKRecord.ID \(deletionID) deletion was part of a failed upload batch")
+                continue
+            } else if uploadError.code == .unknownItem {
+                logger.error("UnknownItem error returned for deletion of CKRecord.ID \(deletionID.recordName); continuing")
+                continue
+            } else {
+                logger.error("Unhandled error\n\(ckError)\nfor deletion of record with ID \(deletionID.recordName)")
+                coordinator.stopSyncDueToError(.unhandledError(ckError))
+            }
+        }
 
         syncContext.saveIfChanged()
         if !refetchIDs.isEmpty {
