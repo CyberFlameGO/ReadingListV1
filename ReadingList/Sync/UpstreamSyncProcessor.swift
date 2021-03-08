@@ -12,6 +12,7 @@ class UpstreamSyncProcessor {
     let orderedTypesToSync: [CKRecordRepresentable.Type]
     var localTransactionsPendingPushCompletion = [NSPersistentHistoryTransaction]()
     private let historyFetcher: PersistentHistoryFetcher
+    private var recordUploadBatchSize = 100
 
     init(container: NSPersistentContainer, syncContext: NSManagedObjectContext, cloudOperationQueue: ConcurrentCKQueue, types: [CKRecordRepresentable.Type]) {
         self.container = container
@@ -28,12 +29,18 @@ class UpstreamSyncProcessor {
     private var cancellables = Set<AnyCancellable>()
 
     func start() {
-        self.syncContext.refreshAllObjects()
+        syncContext.refreshAllObjects()
         NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange, object: container.persistentStoreCoordinator)
             .sink(receiveValue: handleLocalChangeNotification)
             .store(in: &cancellables)
-        self.bufferBookmark = latestConfirmedUploadedTransaction
-        self.enqueueUploadOperations()
+        if let latestConfirmedUploadedTransaction = latestConfirmedUploadedTransaction {
+            logger.info("Initialising bufferBookmark to latest confirmed upload time of \(latestConfirmedUploadedTransaction)")
+            bufferBookmark = latestConfirmedUploadedTransaction
+        } else {
+            logger.info("Initialising bufferBookmark to now")
+            bufferBookmark = Date()
+        }
+        enqueueUploadOperations()
     }
 
     func stop() {
@@ -52,7 +59,6 @@ class UpstreamSyncProcessor {
                 enqueueUploadOperationsForPendingTransactions()
             }
         } else {
-            enqueueUploadOfAllObjects()
         }
     }
 
@@ -79,149 +85,154 @@ class UpstreamSyncProcessor {
             bufferBookmark = lastTransaction.timestamp
         }
     }
+    
+    private func markFirstPendingTransactionAsComplete() {
+        let transaction = localTransactionsPendingPushCompletion.removeFirst()
+        logger.info("Updating confirmed pushed timestamp to \(transaction.timestamp)")
+        latestConfirmedUploadedTransaction = transaction.timestamp
+        historyFetcher.deleteHistory(beforeToken: transaction.token)
+    }
 
     private func enqueueUploadOperationsForPendingTransactions() {
-        let updateBufferBookmarkOperation = BlockOperation { [weak self] in
+        let markPendingTransactionAsCompleteOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
-            let transaction = self.localTransactionsPendingPushCompletion.removeFirst()
-            logger.info("Updating confirmed pushed timestamp to \(transaction.timestamp)")
-            self.latestConfirmedUploadedTransaction = transaction.timestamp
-            self.historyFetcher.deleteHistory(beforeToken: transaction.token)
-            self.enqueueUploadOperations()
+            self.markFirstPendingTransactionAsComplete()
         }
 
-        let uploadOperation = uploadRecordsOperation {
-            updateBufferBookmarkOperation.cancel()
-        }
+        // We don't need to be atomic if we are inserting new records; this means that if we are re-syncing and all our records already
+        // exist on the remote server, we handle this much more efficiently, since we will get the errors all at once, rather than just
+        // the first error within a partialFailure wrapper.
+        let uploadInsertsOperation = uploadRecordChangesOperation(didFail: {})
+        uploadInsertsOperation.name = "InsertNewRecords"
+        uploadInsertsOperation.isAtomic = false
 
-        let buildCKRecordsOperation = BlockOperation { [weak self] in
+        let uploadChangesOperation = uploadRecordChangesOperation {
+            markPendingTransactionAsCompleteOperation.cancel()
+        }
+        uploadChangesOperation.name = "UploadChangedRecords"
+
+        let attachCKRecordsOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
             logger.info("Building CKRecords for upload")
             self.syncContext.performAndWait {
-                guard let transaction = self.localTransactionsPendingPushCompletion.first else {
-                    logger.info("No transactions are pending upload; cancelling upload operation.")
-                    uploadOperation.cancel()
-                    updateBufferBookmarkOperation.cancel()
-                    return
-                }
-                guard let transactionNotificationUserInfo = transaction.objectIDNotification().userInfo else {
-                    self.coordinator?.stopSyncDueToError(.unexpectedResponse("Merge notification UserInfo was nil"))
-                    return
-                }
-                NSManagedObjectContext.mergeChanges(fromRemoteContextSave: transactionNotificationUserInfo, into: [self.syncContext])
-                if let changes = transaction.changes {
-                    self.attachCKRecords(for: changes, to: uploadOperation)
+                // First, get the transaction we are dealing with and merge its changes into the sync context
+                if let transaction = self.localTransactionsPendingPushCompletion.first {
+                    if let transactionNotificationUserInfo = transaction.objectIDNotification().userInfo {
+                        NSManagedObjectContext.mergeChanges(fromRemoteContextSave: transactionNotificationUserInfo, into: [self.syncContext])
+                    } else {
+                        self.coordinator?.stopSyncDueToError(.unexpectedResponse("Merge notification UserInfo was nil"))
+                        return
+                    }
                 }
 
-                if uploadOperation.recordsToSave?.isEmpty != false && uploadOperation.recordIDsToDelete?.isEmpty != false {
-                    logger.info("Transaction had no changes, cancelling upload and moving timestamp to \(transaction.timestamp)")
-                    self.localTransactionsPendingPushCompletion.removeFirst()
-                    uploadOperation.cancel()
-                    updateBufferBookmarkOperation.cancel()
-                    self.latestConfirmedUploadedTransaction = transaction.timestamp
+                // Then, attach the inserts, updates and deletes to the pre-created CKModifyRecords operations
+                let objectsForInsert = self.getObjectBatchForInsert()
+                if objectsForInsert.isEmpty {
+                    uploadInsertsOperation.cancel()
+                } else {
+                    uploadInsertsOperation.recordsToSave = objectsForInsert.map { $0.buildCKRecord() }
+                    self.traceOperationDetails(uploadInsertsOperation)
+                }
+
+                if let transaction = self.localTransactionsPendingPushCompletion.first {
+                    if let changes = transaction.changes {
+                        logger.trace("Building CKRecords for local transaction consisting of changes:\n\(changes.description())")
+                        uploadChangesOperation.recordsToSave = self.buildCKRecordUpdates(for: changes)
+                        uploadChangesOperation.recordIDsToDelete = self.buildCKRecordDeletionIDs(for: changes)
+                        self.traceOperationDetails(uploadChangesOperation)
+                    }
+
+                    // If we did not attach any meaningful work to the ModifyRecords operations, then cancel the operation and remove it as a
+                    // dependency from further work.
+                    if uploadChangesOperation.isEmpty {
+                        logger.info("Upload Changes operation was empty, cancelling upload")
+                        markPendingTransactionAsCompleteOperation.cancel()
+                        uploadChangesOperation.cancel()
+
+                        // Just mark the pending transaction as complete right now, since it did not produce any actionable work.
+                        // Note that for simplicity we cancel the operation defined above which was going to do work, since a
+                        // CKOperation will report a failure with code `operationCancelled` which would trigger the default error
+                        // handling of cancelling the next operation. We cancel the operation and call the function ourself.
+                        self.markFirstPendingTransactionAsComplete()
+                    }
+                } else {
+                    markPendingTransactionAsCompleteOperation.cancel()
+                    uploadChangesOperation.cancel()
+                }
+
+                // If our Insert batch was at the maximum size, then enqueue a further upload pass after this one
+                if self.localTransactionsPendingPushCompletion.count > 1 || objectsForInsert.count == self.recordUploadBatchSize {
                     self.enqueueUploadOperations()
                 }
             }
         }
 
-        uploadOperation.addDependency(buildCKRecordsOperation)
-        updateBufferBookmarkOperation.addDependency(uploadOperation)
+        uploadInsertsOperation.addDependency(attachCKRecordsOperation)
+        uploadChangesOperation.addDependency(attachCKRecordsOperation)
 
-        cloudOperationQueue.addOperations([buildCKRecordsOperation, uploadOperation, updateBufferBookmarkOperation])
+        markPendingTransactionAsCompleteOperation.addDependency(uploadChangesOperation)
+
+        cloudOperationQueue.addOperations([attachCKRecordsOperation, uploadInsertsOperation, uploadChangesOperation, markPendingTransactionAsCompleteOperation])
         logger.info("Upload operations added to operation queue")
     }
 
-    private func enqueueUploadOfAllObjects() {
-        var timestamp: Date?
-
-        let updateBookmarkOperation = BlockOperation { [weak self] in
-            guard let self = self else { return }
-            guard let timestamp = timestamp else { fatalError("Unexpected nil timestamp") }
-            logger.info("Updating upload bookmark to \(timestamp)")
-            self.latestConfirmedUploadedTransaction = timestamp
-            self.bufferBookmark = timestamp
-
-            // In case there have been any local changes since we started uploading all records:
-            self.enqueueUploadOperations()
-        }
-
-        let uploadOperation = uploadRecordsOperation {
-            updateBookmarkOperation.cancel()
-        }
-
-        let fetchRecordsOperation = BlockOperation { [weak self] in
-            guard let self = self else { return }
-            logger.info("Fetching all records to upload")
-            timestamp = Date()
-            let allRecords = self.getAllObjectCkRecords() // TODO Perhaps just un-uploaded objects?
-            uploadOperation.recordsToSave = allRecords
-        }
-
-        uploadOperation.addDependency(fetchRecordsOperation)
-        updateBookmarkOperation.addDependency(uploadOperation)
-        cloudOperationQueue.addOperations([fetchRecordsOperation, uploadOperation, updateBookmarkOperation])
-    }
-
-    private func getAllObjectCkRecords() -> [CKRecord] {
-        var ckRecords: [CKRecord] = []
-        for entity in orderedTypesToSync {
-            let request = entity.fetchRequest(in: syncContext)
-            request.returnsObjectsAsFaults = false
-            request.includesPropertyValues = true
-            request.fetchBatchSize = 100
-            let objects = try! syncContext.fetch(request) as! [CKRecordRepresentable]
-            ckRecords.append(contentsOf: objects.map { $0.buildCKRecord() })
-        }
-
-        return ckRecords
-    }
-
-    private func attachCKRecords(for changes: [NSPersistentHistoryChange], to uploadOpertion: CKModifyRecordsOperation) {
-        logger.debug("Building CKRecords for local transaction consisting of changes:\n\(changes.description())")
-
+    private func buildCKRecordUpdates(for changes: [NSPersistentHistoryChange]) -> [CKRecord] {
         // We want to extract the objects corresponding to the changes to that we can determine the entity types,
         // and then order them according to the orderedTypesToSync property (this will help keep CKReferences intact),
         // before generating our CKRecords.
-        let changesAndObjects = changes.filter { $0.changeType != .delete }
+        let changesAndObjects = changes.filter { $0.changeType == .update }
             .compactMap { change -> (change: NSPersistentHistoryChange, managedObject: CKRecordRepresentable)? in
                 guard let managedObject = try? self.syncContext.existingObject(with: change.changedObjectID) as? CKRecordRepresentable else {
                     return nil
                 }
+                if managedObject.ckRecordEncodedSystemFields == nil { return nil }
                 return (change, managedObject)
             }
         let changesByEntityType = Dictionary(grouping: changesAndObjects) { $0.managedObject.entity }
 
-        uploadOpertion.recordsToSave = self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity(in: syncContext)] }
+        return self.orderedTypesToSync.compactMap { changesByEntityType[$0.entity(in: syncContext)] }
             .flatMap { $0 }
             .compactMap { change, managedObject -> CKRecord? in
-                let ckKeysToUpload: [String]?
-                if change.changeType == .update {
-                    guard let coreDataKeys = change.updatedProperties?.map(\.name) else { return nil }
-                    let ckRecordKeys = coreDataKeys.compactMap { managedObject.ckRecordKey(forLocalPropertyKey: $0) }
-                    if ckRecordKeys.isEmpty { return nil }
-                    ckKeysToUpload = ckRecordKeys
-                } else {
-                    ckKeysToUpload = nil
-                }
-
-                return managedObject.buildCKRecord(ckRecordKeys: ckKeysToUpload)
+                guard let coreDataKeys = change.updatedProperties?.map(\.name) else { return nil }
+                let ckRecordKeys = coreDataKeys.compactMap { managedObject.ckRecordKey(forLocalPropertyKey: $0) }
+                if ckRecordKeys.isEmpty { return nil }
+                return managedObject.buildCKRecord(ckRecordKeys: ckRecordKeys)
             }
-
-        uploadOpertion.recordIDsToDelete = changes.filter { $0.changeType == .delete }
+    }
+    
+    private func buildCKRecordDeletionIDs(for changes: [NSPersistentHistoryChange]) -> [CKRecord.ID] {
+        return changes.filter { $0.changeType == .delete }
             .compactMap { (change: NSPersistentHistoryChange) -> CKRecord.ID? in
                 guard let remoteIdentifier = change.tombstone?[SyncConstants.remoteIdentifierKeyPath] as? String else { return nil }
                 return CKRecord.ID(recordName: remoteIdentifier, zoneID: SyncConstants.zoneID)
             }
-
-        if !uploadOpertion.recordsToSave!.isEmpty {
-            logger.trace("Attached \(uploadOpertion.recordsToSave!.count) records to save:\n\(uploadOpertion.recordsToSave!.map { $0.description }.joined(separator: "\n"))")
-        }
-        if !uploadOpertion.recordIDsToDelete!.isEmpty {
-            logger.trace("Attached \(uploadOpertion.recordIDsToDelete!.count) records to delete:\n\(uploadOpertion.recordIDsToDelete!.map { $0.recordName }.joined(separator: "\n"))")
-        }
     }
 
-    private func uploadRecordsOperation(didFail: @escaping () -> Void) -> CKModifyRecordsOperation {
+    private func traceOperationDetails(_ opertion: CKModifyRecordsOperation) {
+        if let recordsToSave = opertion.recordsToSave, !recordsToSave.isEmpty {
+            logger.trace("CKModifyRecordsOperation \(opertion.name ?? "(unnamed)") had \(recordsToSave.count) records to save:\n\(recordsToSave.map { $0.description }.joined(separator: "\n"))")
+        }
+        if let recordsToDelete = opertion.recordIDsToDelete, !recordsToDelete.isEmpty {
+            logger.trace("CKModifyRecordsOperation \(opertion.name ?? "(unnamed)") had \(recordsToDelete.count) records to delete:\n\(recordsToDelete.map { $0.recordName }.joined(separator: "\n"))")
+        }
+    }
+    
+    private func getObjectBatchForInsert() -> [CKRecordRepresentable] {
+        var objects = [CKRecordRepresentable]()
+        for entity in orderedTypesToSync {
+            if objects.count >= recordUploadBatchSize { break }
+            let request = entity.fetchRequest(in: syncContext)
+            request.returnsObjectsAsFaults = false
+            request.includesPropertyValues = true
+            request.predicate = NSPredicate(format: "\(SyncConstants.ckRecordEncodedSystemFieldsKey) = nil")
+            request.fetchLimit = recordUploadBatchSize - objects.count
+            let fetchResults = try! syncContext.fetch(request) as! [CKRecordRepresentable]
+            objects.append(contentsOf: fetchResults)
+        }
+        return objects
+    }
+
+    private func uploadRecordChangesOperation(didFail: @escaping () -> Void) -> CKModifyRecordsOperation {
         let operation = CKModifyRecordsOperation()
         operation.modifyRecordsCompletionBlock = { [weak self] serverRecords, _, error in
             guard let self = self else { return }
@@ -232,8 +243,8 @@ class UpstreamSyncProcessor {
                 } else {
                     logger.info("Completed upload. Updating local models with server record data.")
                     guard let serverRecords = serverRecords else {
-                        logger.error("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation")
-                        self.coordinator?.stopSyncDueToError(.unexpectedResponse("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation"))
+                        logger.error("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation \(operation.name ?? "(unnamed)")")
+                        self.coordinator?.stopSyncDueToError(.unexpectedResponse("Unexpected nil `serverRecords` in response from CKModifyRecordsOperation operation \(operation.name ?? "(unnamed)")"))
                         return
                     }
                     self.updateLocalModelsAfterUpload(with: serverRecords)
@@ -320,6 +331,7 @@ class UpstreamSyncProcessor {
                 localObject.setSystemFields(nil)
             } else if uploadError.code == .invalidArguments {
                 // TODO What causes this?
+                // Answer: invalid CKRecord.
                 logger.error("InvalidArguments error\n\(ckError)\nfor record:\n\(record)")
                 coordinator.stopSyncDueToError(.unhandledError(ckError))
             } else {
