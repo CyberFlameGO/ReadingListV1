@@ -101,7 +101,7 @@ final class SyncCoordinator {
         cloudOperationQueue.cancelAll()
         isStarted = false
     }
-    
+
     func reset() {
         upstreamProcessor.reset()
         downstreamProcessor.resetChangeTracking()
@@ -132,6 +132,7 @@ final class SyncCoordinator {
     }
 
     func forceFullResync() {
+        logger.info("Forcing full iCloud re-sync")
         cloudOperationQueue.cancelAll()
         cloudOperationQueue.addBlock {
             self.syncContext.performAndWait {
@@ -161,14 +162,15 @@ final class SyncCoordinator {
     func status() -> SyncStatus {
         var totalCounts = [String: Int]()
         var uploadedCounts = [String: Int]()
-        syncContext.performAndWait {
+        let backgroundContext = persistentContainer.newBackgroundContext()
+        backgroundContext.performAndWait {
             for type in typesToSync {
-                let fetchRequest = type.fetchRequest(in: syncContext)
-                let countResult = try! syncContext.count(for: fetchRequest)
+                let fetchRequest = type.fetchRequest(in: backgroundContext)
+                let countResult = try! backgroundContext.count(for: fetchRequest)
                 totalCounts[type.ckRecordType] = countResult
 
                 fetchRequest.predicate = NSPredicate(format: "\(SyncConstants.ckRecordEncodedSystemFieldsKey) != nil")
-                let uploadedCount = try! syncContext.count(for: fetchRequest)
+                let uploadedCount = try! backgroundContext.count(for: fetchRequest)
                 uploadedCounts[type.ckRecordType] = uploadedCount
             }
         }

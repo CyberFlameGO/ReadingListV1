@@ -59,7 +59,7 @@ public extension NSManagedObject {
         }
         return entity
     }
-    
+
     class func fetchRequest(in context: NSManagedObjectContext) -> NSFetchRequest<NSFetchRequestResult> {
         let entityDescription = entity(in: context)
         let fetchRequest = NSFetchRequest<NSFetchRequestResult>()

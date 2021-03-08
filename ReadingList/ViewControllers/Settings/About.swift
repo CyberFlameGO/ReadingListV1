@@ -192,7 +192,7 @@ struct About: View {
             attachments: emailAttachments
         )
     }
-    
+
     var shareLogsSheet: ActionSheet {
         ActionSheet(
             title: Text("Share Log Files"),

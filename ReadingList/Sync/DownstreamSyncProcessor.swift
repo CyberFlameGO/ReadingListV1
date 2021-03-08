@@ -86,7 +86,7 @@ class DownstreamSyncProcessor {
         operation.recordZoneFetchCompletionBlock = { [weak self] _, token, _, _, error in
             guard let self = self else { return }
             self.syncContext.performAndWait {
-                if let error = error {
+                if error != nil {
                     logger.error("Error in recordZoneFetchCompletionBlock")
                     // We shall handle the error once, in the final completion block
                 } else {
@@ -104,7 +104,9 @@ class DownstreamSyncProcessor {
                     logger.info("Calling UIBackgroundFetch completion handler with failure")
                     completion(.failed)
                 }
-                self.handleDownloadError(error)
+                self.handleDownloadError(error) {
+                    self.enqueueFetchRemoteChanges()
+                }
             } else {
                 self.syncContext.performAndWait {
                     logger.info("Remote change fetch completed successfully. Resolving any references")
@@ -130,9 +132,13 @@ class DownstreamSyncProcessor {
         let operation = CKFetchRecordsOperation(recordIDs: recordIDs)
         operation.fetchRecordsCompletionBlock = { [weak self] records, error in
             guard let self = self else { return }
+            logger.trace("CKFetchRecordsOperation completed")
             self.syncContext.performAndWait {
                 if let error = error {
-                    self.handleDownloadError(error)
+                    self.handleDownloadError(error) {
+                        logger.info("Re-enqueing fetch of records after suspension completion")
+                        self.fetchRecords(recordIDs)
+                    }
                 } else if let records = records {
                     self.commitServerChangesToDatabase(with: Array(records.values), deletedRecordIDs: [])
                 } else {
@@ -142,18 +148,21 @@ class DownstreamSyncProcessor {
                 }
             }
         }
+        // Jump the queue, since getting downstream changes in sooner is better for sync performance (otherwise,
+        // we keep trying to upload over and over getting failures).
+        operation.queuePriority = .high
 
-        logger.info("Fetching remote records with IDs \(recordIDs.map { $0.recordName }.joined(separator: ", "))")
+        logger.info("Requesting fetch of remote records with IDs \(recordIDs.map { $0.recordName }.joined(separator: ", "))")
         cloudOperationQueue.addOperation(operation)
     }
 
-    private func handleDownloadError(_ error: Error) {
+    private func handleDownloadError(_ error: Error, onSuspensionCompletion: (() -> Void)?) {
         guard let ckError = error as? CKError else {
             self.coordinator?.stopSyncDueToError(.unexpectedErrorType(error))
             return
         }
 
-        logger.error("Handling CKError with code \(ckError.code.name)")
+        logger.error("Handling download CKError with code \(ckError.code.name)")
         if ckError.code == .operationCancelled {
             return
         } else if ckError.code == .changeTokenExpired {
@@ -167,15 +176,15 @@ class DownstreamSyncProcessor {
                 self.coordinator?.stopSyncDueToError(.unexpectedResponse("Missing inner error when fetching zone changes"))
                 return
             }
-            handleDownloadError(relevantInnerError)
+            handleDownloadError(relevantInnerError, onSuspensionCompletion: nil)
         } else if let retryDelay = ckError.retryAfterSeconds {
             logger.info("Instructed to delay for \(retryDelay) seconds: suspending operation queue")
             self.cloudOperationQueue.suspend()
-            // Enqueue a fetch operation ready for when we unsuspend things
-            self.enqueueFetchRemoteChanges()
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + retryDelay) {
+            // Delay for slightly longer (10%) to try to get into iCloud's good books
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (retryDelay * 1.1)) {
                 logger.info("Resuming operation queue")
                 self.cloudOperationQueue.resume()
+                onSuspensionCompletion?()
             }
         } else {
             logger.critical("Unhandled error response \(ckError)")
@@ -235,7 +244,6 @@ class DownstreamSyncProcessor {
             if localObject.ckRecordEncodedSystemFields == nil {
                 logger.info("Merging \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
                 localObject.merge(with: ckRecord)
-                // TODO we need to somehow enqueue this to be repushed. Setting the transaction author perhaps?
             } else {
                 logger.info("Updating \(ckRecord.recordType) \(localObject.objectID.uriRepresentation().path) from CKRecord \(ckRecord.recordID.recordName)")
                 let keysPendingUpdate = coordinator.transactionsPendingUpload().ckRecordKeysForChanges(involving: localObject.objectID)
@@ -244,6 +252,7 @@ class DownstreamSyncProcessor {
                 }
                 localObject.update(from: ckRecord, excluding: keysPendingUpdate)
             }
+            localObject.resolveMergeConflicts()
         } else {
             logger.info("Creating new \(ckRecord.recordType) with record name \(ckRecord.recordID.recordName)")
 

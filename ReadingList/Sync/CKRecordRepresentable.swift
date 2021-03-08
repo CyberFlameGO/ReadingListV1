@@ -30,6 +30,7 @@ protocol CKRecordRepresentable: NSManagedObject {
 
     func getValue(for key: String) -> CKRecordValueProtocol?
     func setValue(_ value: CKRecordValueProtocol?, for ckRecordKey: String)
+    func resolveMergeConflicts()
 }
 
 extension CKRecordRepresentable {

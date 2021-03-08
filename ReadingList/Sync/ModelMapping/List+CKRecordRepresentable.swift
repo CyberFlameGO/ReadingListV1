@@ -44,6 +44,8 @@ extension List: CKRecordRepresentable {
         }
     }
 
+    func resolveMergeConflicts() { }
+
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return List.CKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }

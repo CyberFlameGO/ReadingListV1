@@ -116,6 +116,13 @@ extension Book: CKRecordRepresentable {
         }
     }
 
+    func resolveMergeConflicts() {
+        if readState != .reading && (currentPage != nil || currentPercentage != nil) {
+            logger.error("Resolving conflict with a present page/percentage progress on a non-Reading book \(remoteIdentifier)")
+            setProgress(nil)
+        }
+    }
+
     static func withRemoteIdentifier(_ id: String) -> NSPredicate {
         return NSPredicate(format: "%K == %@", #keyPath(Book.remoteIdentifier), id)
     }

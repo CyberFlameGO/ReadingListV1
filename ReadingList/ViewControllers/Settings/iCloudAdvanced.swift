@@ -52,13 +52,13 @@ struct CloudSyncAdvanced: View {
                 )
             }
             // Removed as this can cause a long delay while errors are resolved.
-            /*Button("Force Full Resync") {
+            Button("Force Full Resync") {
                 forceFullResyncSheetShowing = true
             }.foregroundColor(Color(.systemRed))
             .actionSheet(isPresented: $forceFullResyncSheetShowing) {
                 ActionSheet(
                     title: Text("Force Full iCloud Sync"),
-                    message: Text("This will re-sync your entire library with iCloud. This may take some time to complete. Are you sure you wish to continue?"),
+                    message: Text("This will re-sync your entire library with iCloud. It is recommended that you only proceed if you are experiencing issues with iCloud sync. This may take a long time to complete. Are you sure you wish to continue?"),
                     buttons: [
                         .destructive(Text("Resync")) {
                             guard let syncCoordinator = AppDelegate.shared.syncCoordinator else { return }
@@ -67,7 +67,7 @@ struct CloudSyncAdvanced: View {
                         },
                         .cancel()
                     ])
-            }*/
+            }
         }
     }
 }

@@ -68,6 +68,8 @@ extension ListItem: CKRecordRepresentable {
         }
     }
 
+    func resolveMergeConflicts() { }
+
     func ckRecordKey(forLocalPropertyKey localPropertyKey: String) -> String? {
         return ListItem.CKRecordKey.from(coreDataKey: localPropertyKey)?.rawValue
     }

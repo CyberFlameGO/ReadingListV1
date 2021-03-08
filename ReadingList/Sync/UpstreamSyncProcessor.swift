@@ -52,22 +52,15 @@ class UpstreamSyncProcessor {
         latestConfirmedUploadedTransaction = nil
     }
 
-    func enqueueUploadOperations() {
-        if let bufferBookmark = self.bufferBookmark {
-            addNewTransactionsToBuffer(since: bufferBookmark)
-            if !localTransactionsPendingPushCompletion.isEmpty {
-                enqueueUploadOperationsForPendingTransactions()
-            }
-        } else {
-        }
-    }
-
     private func handleLocalChangeNotification(_ notification: Notification) {
         guard let historyToken = notification.userInfo?[NSPersistentHistoryTokenKey] as? NSPersistentHistoryToken else {
             logger.error("Could not find Persistent History Token from remote change notification")
             return
         }
         logger.debug("Detected local change \(historyToken)")
+        if let bufferBookmark = self.bufferBookmark {
+            addNewTransactionsToBuffer(since: bufferBookmark)
+        }
         enqueueUploadOperations()
     }
 
@@ -77,7 +70,8 @@ class UpstreamSyncProcessor {
         var transactions = historyFetcher.fetch(fromDate: bookmark)
         transactions.removeAll { $0.contextName == syncContext.name }
         if transactions.isEmpty {
-            logger.info("No transactions found")
+            logger.info("No transactions found since \(bookmark) to add to buffer")
+            return
         }
 
         localTransactionsPendingPushCompletion.append(contentsOf: transactions)
@@ -85,7 +79,7 @@ class UpstreamSyncProcessor {
             bufferBookmark = lastTransaction.timestamp
         }
     }
-    
+
     private func markFirstPendingTransactionAsComplete() {
         let transaction = localTransactionsPendingPushCompletion.removeFirst()
         logger.info("Updating confirmed pushed timestamp to \(transaction.timestamp)")
@@ -93,8 +87,8 @@ class UpstreamSyncProcessor {
         historyFetcher.deleteHistory(beforeToken: transaction.token)
     }
 
-    private func enqueueUploadOperationsForPendingTransactions() {
-        let markPendingTransactionAsCompleteOperation = BlockOperation { [weak self] in
+    func enqueueUploadOperations() {
+        let markPendingTransactionCompleteOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
             self.markFirstPendingTransactionAsComplete()
         }
@@ -102,18 +96,17 @@ class UpstreamSyncProcessor {
         // We don't need to be atomic if we are inserting new records; this means that if we are re-syncing and all our records already
         // exist on the remote server, we handle this much more efficiently, since we will get the errors all at once, rather than just
         // the first error within a partialFailure wrapper.
-        let uploadInsertsOperation = uploadRecordChangesOperation(didFail: {})
+        let uploadInsertsOperation = uploadRecordChangesOperation()
         uploadInsertsOperation.name = "InsertNewRecords"
         uploadInsertsOperation.isAtomic = false
 
         let uploadChangesOperation = uploadRecordChangesOperation {
-            markPendingTransactionAsCompleteOperation.cancel()
+            markPendingTransactionCompleteOperation.cancel()
         }
         uploadChangesOperation.name = "UploadChangedRecords"
 
         let attachCKRecordsOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
-            logger.info("Building CKRecords for upload")
             self.syncContext.performAndWait {
                 // First, get the transaction we are dealing with and merge its changes into the sync context
                 if let transaction = self.localTransactionsPendingPushCompletion.first {
@@ -146,7 +139,7 @@ class UpstreamSyncProcessor {
                     // dependency from further work.
                     if uploadChangesOperation.isEmpty {
                         logger.info("Upload Changes operation was empty, cancelling upload")
-                        markPendingTransactionAsCompleteOperation.cancel()
+                        markPendingTransactionCompleteOperation.cancel()
                         uploadChangesOperation.cancel()
 
                         // Just mark the pending transaction as complete right now, since it did not produce any actionable work.
@@ -156,7 +149,7 @@ class UpstreamSyncProcessor {
                         self.markFirstPendingTransactionAsComplete()
                     }
                 } else {
-                    markPendingTransactionAsCompleteOperation.cancel()
+                    markPendingTransactionCompleteOperation.cancel()
                     uploadChangesOperation.cancel()
                 }
 
@@ -170,9 +163,9 @@ class UpstreamSyncProcessor {
         uploadInsertsOperation.addDependency(attachCKRecordsOperation)
         uploadChangesOperation.addDependency(attachCKRecordsOperation)
 
-        markPendingTransactionAsCompleteOperation.addDependency(uploadChangesOperation)
+        markPendingTransactionCompleteOperation.addDependency(uploadChangesOperation)
 
-        cloudOperationQueue.addOperations([attachCKRecordsOperation, uploadInsertsOperation, uploadChangesOperation, markPendingTransactionAsCompleteOperation])
+        cloudOperationQueue.addOperations([attachCKRecordsOperation, uploadInsertsOperation, uploadChangesOperation, markPendingTransactionCompleteOperation])
         logger.info("Upload operations added to operation queue")
     }
 
@@ -199,7 +192,7 @@ class UpstreamSyncProcessor {
                 return managedObject.buildCKRecord(ckRecordKeys: ckRecordKeys)
             }
     }
-    
+
     private func buildCKRecordDeletionIDs(for changes: [NSPersistentHistoryChange]) -> [CKRecord.ID] {
         return changes.filter { $0.changeType == .delete }
             .compactMap { (change: NSPersistentHistoryChange) -> CKRecord.ID? in
@@ -216,7 +209,7 @@ class UpstreamSyncProcessor {
             logger.trace("CKModifyRecordsOperation \(opertion.name ?? "(unnamed)") had \(recordsToDelete.count) records to delete:\n\(recordsToDelete.map { $0.recordName }.joined(separator: "\n"))")
         }
     }
-    
+
     private func getObjectBatchForInsert() -> [CKRecordRepresentable] {
         var objects = [CKRecordRepresentable]()
         for entity in orderedTypesToSync {
@@ -232,14 +225,14 @@ class UpstreamSyncProcessor {
         return objects
     }
 
-    private func uploadRecordChangesOperation(didFail: @escaping () -> Void) -> CKModifyRecordsOperation {
+    private func uploadRecordChangesOperation(didFail: (() -> Void)? = nil) -> CKModifyRecordsOperation {
         let operation = CKModifyRecordsOperation()
         operation.modifyRecordsCompletionBlock = { [weak self] serverRecords, _, error in
             guard let self = self else { return }
             self.syncContext.performAndWait {
                 if let error = error {
                     self.handleUploadError(error, records: operation.recordsToSave ?? [], ids: operation.recordIDsToDelete ?? [])
-                    didFail()
+                    didFail?()
                 } else {
                     logger.info("Completed upload. Updating local models with server record data.")
                     guard let serverRecords = serverRecords else {
@@ -285,11 +278,11 @@ class UpstreamSyncProcessor {
         } else if let retryDelay = ckError.retryAfterSeconds {
             logger.info("Instructed to delay for \(retryDelay) seconds: suspending operation queue")
             cloudOperationQueue.suspend()
-            // Enqueue an upload operation ready for when we unsuspend things
-            enqueueUploadOperations()
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + retryDelay) {
+            // Delay for slightly longer (10%) to try to get into iCloud's good books
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (retryDelay * 1.1)) {
                 logger.info("Resuming operation queue")
                 self.cloudOperationQueue.resume()
+                self.enqueueUploadOperations()
             }
         } else {
             logger.critical("Unhandled error response \(ckError)")
