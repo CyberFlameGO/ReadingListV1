@@ -87,8 +87,37 @@ class UpstreamSyncProcessor {
         historyFetcher.deleteHistory(beforeToken: transaction.token)
     }
 
+    private func processTransactionInBatches(_ recordsForUpdate: inout [CKRecord], _ recordsForDeletion: inout [CKRecord.ID]) {
+        var batchOperations = [Operation]()
+        repeat {
+            let uploadBatchOperation = self.uploadRecordChangesOperation()
+            uploadBatchOperation.name = "UploadChanges_Batch"
+            uploadBatchOperation.queuePriority = .veryHigh
+
+            let recordsToSaveBatch = Array(recordsForUpdate.prefix(self.recordUploadBatchSize))
+            recordsForUpdate.removeFirst(recordsToSaveBatch.count)
+            uploadBatchOperation.recordsToSave = recordsToSaveBatch
+
+            let recordIDsToDeleteBatch = Array(recordsForDeletion.prefix(self.recordUploadBatchSize - recordsToSaveBatch.count))
+            recordsForDeletion.removeFirst(recordIDsToDeleteBatch.count)
+            uploadBatchOperation.recordIDsToDelete = recordIDsToDeleteBatch
+
+            if let dependentOperation = batchOperations.last {
+                uploadBatchOperation.addDependency(dependentOperation)
+            }
+            batchOperations.append(uploadBatchOperation)
+            traceOperationDetails(uploadBatchOperation)
+        } while !recordsForUpdate.isEmpty || !recordsForDeletion.isEmpty
+
+        logger.info("Split change transaction into \(batchOperations.count) sub-operations, enqueued at high priority")
+        batchOperations.append(BlockOperation { [weak self] in
+            guard let self = self else { return }
+            self.markFirstPendingTransactionAsComplete()
+        })
+        self.cloudOperationQueue.addOperations(batchOperations)
+    }
+
     func enqueueUploadOperations() {
-        
         let markPendingTransactionCompleteOperation = BlockOperation { [weak self] in
             guard let self = self else { return }
             self.markFirstPendingTransactionAsComplete()
@@ -131,8 +160,20 @@ class UpstreamSyncProcessor {
                 if let transaction = self.localTransactionsPendingPushCompletion.first {
                     if let changes = transaction.changes {
                         logger.trace("Building CKRecords for local transaction consisting of changes:\n\(changes.description())")
-                        uploadChangesOperation.recordsToSave = self.buildCKRecordUpdates(for: changes)
-                        uploadChangesOperation.recordIDsToDelete = self.buildCKRecordDeletionIDs(for: changes)
+                        var recordsForUpdate = self.buildCKRecordUpdates(for: changes)
+                        var recordsForDeletion = self.buildCKRecordDeletionIDs(for: changes)
+
+                        if recordsForUpdate.count + recordsForDeletion.count > self.recordUploadBatchSize {
+                            logger.info("Transactional change produced a change-set larger than the maximum batch size")
+                            markPendingTransactionCompleteOperation.cancel()
+                            uploadChangesOperation.cancel()
+
+                            self.processTransactionInBatches(&recordsForUpdate, &recordsForDeletion)
+                            return
+                        } else {
+                            uploadChangesOperation.recordsToSave = recordsForUpdate
+                            uploadChangesOperation.recordIDsToDelete = recordsForDeletion
+                        }
                         self.traceOperationDetails(uploadChangesOperation)
                     }
 
